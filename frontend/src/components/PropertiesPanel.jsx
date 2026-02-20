@@ -1,14 +1,6 @@
 import React from 'react';
 import { X, Server, Database, Share2, Users, Power, PowerOff } from 'lucide-react';
 
-// Default configs for each node type
-const defaultConfigs = {
-  client: { rps: 100 },
-  loadbalancer: { algorithm: 'round-robin' },
-  appserver: { maxRPS: 100, baseLatency: 20 },
-  database: { maxRPS: 50, baseLatency: 50 },
-};
-
 const typeLabels = {
   client: 'Client',
   loadbalancer: 'Load Balancer',
@@ -37,8 +29,32 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
   const status = node.data.metrics?.status;
   const isDown = status === 'down';
 
-  const handleChange = (field, value) => {
+  // Update local state + send to backend if running
+  const handleChange = async (field, value) => {
     onUpdate(node.id, { [field]: value });
+
+    // Send live config to backend during simulation
+    if (isRunning && sessionId) {
+      try {
+        const body = { nodeId: node.id };
+
+        if (field === 'rps') {
+          body.rps = value;
+        } else if (field === 'maxRPS') {
+          body.maxRPS = value;
+        } else if (field === 'baseLatency') {
+          body.baseLatency = value;
+        }
+
+        await fetch(`/api/simulate/${sessionId}/config`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+      } catch (err) {
+        console.error('Failed to update config:', err);
+      }
+    }
   };
 
   return (
@@ -85,7 +101,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 max="1000"
                 value={node.data.rps || 100}
                 onChange={(e) => handleChange('rps', Number(e.target.value))}
-                disabled={isRunning}
                 className="flex-1 accent-emerald-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
               />
               <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
@@ -106,7 +121,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                   max="500"
                   value={node.data.maxRPS || 100}
                   onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
-                  disabled={isRunning}
                   className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
@@ -122,7 +136,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                   max="200"
                   value={node.data.baseLatency || 20}
                   onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
-                  disabled={isRunning}
                   className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
@@ -144,7 +157,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                   max="300"
                   value={node.data.maxRPS || 50}
                   onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
-                  disabled={isRunning}
                   className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
@@ -160,7 +172,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                   max="500"
                   value={node.data.baseLatency || 50}
                   onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
-                  disabled={isRunning}
                   className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
@@ -177,8 +188,7 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
             <select
               value={node.data.algorithm || 'round-robin'}
               onChange={(e) => handleChange('algorithm', e.target.value)}
-              disabled={isRunning}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
             >
               <option value="round-robin">Round Robin</option>
               <option value="least-connections">Least Connections</option>
@@ -196,10 +206,14 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
               <MetricCard label="Throughput" value={node.data.metrics.throughput?.toFixed(0)} />
               <MetricCard label="Queue" value={node.data.metrics.queueDepth?.toFixed(0)} />
               {node.data.metrics.dropped > 0 && (
-                <MetricCard label="Dropped" value={node.data.metrics.dropped?.toFixed(0)} warn />
+                <MetricCard label="Total Dropped" value={node.data.metrics.dropped?.toFixed(0)} warn />
               )}
             </div>
           </div>
+        )}
+
+        {isRunning && (
+          <p className="text-[10px] text-emerald-500/60 italic">⚡ Changes apply instantly to live simulation</p>
         )}
       </div>
 

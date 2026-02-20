@@ -177,9 +177,14 @@ function App() {
         setNodes((nds) =>
           nds.map((node) => {
             if (node.type === 'client') {
+              // Sync client RPS from backend's actual traffic value
               return {
                 ...node,
-                data: { ...node.data, metrics: { throughput: node.data.rps || 100 } },
+                data: {
+                  ...node.data,
+                  rps: tick.totalRPS || node.data.rps || 100,
+                  metrics: { throughput: tick.totalRPS || node.data.rps || 100 },
+                },
               };
             }
             const metrics = tick.nodes.find((m) => m.id === node.id);

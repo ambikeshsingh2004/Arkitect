@@ -10,11 +10,12 @@ type AppServer struct {
 	MaxRPS      float64
 	BaseLatency float64 // ms
 
-	queueDepth  float64
-	throughput  float64
-	dropped     float64
-	latency     float64
-	utilization float64
+	queueDepth   float64
+	throughput   float64
+	dropped      float64 // drops THIS tick
+	totalDropped float64 // accumulated drops since start
+	latency      float64
+	utilization  float64
 }
 
 // NewAppServer creates a new AppServer node.
@@ -37,47 +38,49 @@ func (s *AppServer) Process() {
 		s.throughput = 0
 		s.latency = 0
 		s.utilization = 0
-		// Queue persists but doesn't grow
+		s.dropped = 0
+		s.Incoming = 0 // consume incoming
 		return
 	}
 
-	totalArrival := s.Incoming + s.queueDepth
+	incoming := s.Incoming
+	s.Incoming = 0 // reset incoming immediately after capturing
+
+	totalArrival := incoming + s.queueDepth
 
 	// How much we can actually process this tick
 	processed := math.Min(totalArrival, s.MaxRPS)
 	s.throughput = processed
 
 	// Remaining goes back into queue
-	s.queueDepth = math.Max(0, totalArrival-s.MaxRPS)
+	s.queueDepth = math.Max(0.0, totalArrival-processed)
 
 	// Drop if queue exceeds 5x capacity (prevent infinite buildup)
-	maxQueue := s.MaxRPS * 5
+	maxQueue := s.MaxRPS * 5.0
 	if s.queueDepth > maxQueue {
 		s.dropped = s.queueDepth - maxQueue
+		s.totalDropped += s.dropped // accumulate
 		s.queueDepth = maxQueue
 	} else {
 		s.dropped = 0
 	}
 
-	// Utilization = totalLoad / capacity (spec: uses total load including queue)
-	if s.MaxRPS > 0 {
-		s.utilization = math.Min(totalArrival, s.MaxRPS*2) / s.MaxRPS
-		if s.utilization > 1.0 {
-			s.utilization = 1.0
-		}
+	// Utilization = incoming / capacity (how much of capacity is demanded)
+	if s.MaxRPS > 0.0 {
+		s.utilization = math.Min(incoming/s.MaxRPS, 1.0)
 	}
 
-	// Latency = baseLatency + (queue/capacity * scalingFactor)
+	// Latency = baseLatency + queue wait time (seconds → ms)
 	s.latency = s.BaseLatency
-	if s.MaxRPS > 0 {
-		s.latency += (s.queueDepth / s.MaxRPS) * 1000 // queue delay in ms
+	if s.MaxRPS > 0.0 {
+		s.latency += (s.queueDepth / s.MaxRPS) * 1000.0
 	}
 
 	// Forward processed traffic downstream (cascading overload)
 	downstream := s.Downstream()
-	n := len(downstream)
-	if n > 0 && processed > 0 {
-		perNode := processed / float64(n)
+	n := float64(len(downstream))
+	if n > 0.0 && processed > 0.0 {
+		perNode := processed / n
 		for _, node := range downstream {
 			node.AddIncoming(perNode)
 		}
@@ -94,7 +97,7 @@ func (s *AppServer) GetMetrics() NodeMetrics {
 		Latency:     s.latency,
 		QueueDepth:  s.queueDepth,
 		Throughput:  s.throughput,
-		Dropped:     s.dropped,
+		Dropped:     s.totalDropped,
 		Status:      StatusFromUtilization(s.utilization, s.queueDepth, s.Down),
 	}
 }

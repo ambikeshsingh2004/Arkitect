@@ -20,14 +20,17 @@ func NewClient(id, label string) *Client {
 
 // Process forwards all incoming traffic to downstream nodes.
 func (c *Client) Process() {
-	c.throughput = c.Incoming
+	incoming := c.Incoming
+	c.Incoming = 0 // reset incoming immediately after capturing
+
+	c.throughput = incoming
 	downstream := c.Downstream()
-	n := len(downstream)
-	if n == 0 || c.Incoming == 0 {
+	n := float64(len(downstream))
+	if n == 0.0 || incoming == 0.0 {
 		return
 	}
 
-	perNode := c.Incoming / float64(n)
+	perNode := incoming / n
 	for _, node := range downstream {
 		node.AddIncoming(perNode)
 	}

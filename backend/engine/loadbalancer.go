@@ -4,7 +4,6 @@ package engine
 // DOWN nodes are excluded from routing, causing traffic redistribution.
 type LoadBalancer struct {
 	BaseNode
-	rrIndex    int
 	throughput float64
 }
 
@@ -24,12 +23,16 @@ func NewLoadBalancer(id, label string) *LoadBalancer {
 func (lb *LoadBalancer) Process() {
 	if lb.Down {
 		lb.throughput = 0
+		lb.Incoming = 0 // consume incoming
 		return
 	}
 
-	lb.throughput = lb.Incoming
+	incoming := lb.Incoming
+	lb.Incoming = 0 // reset incoming immediately after capturing
+
+	lb.throughput = incoming
 	downstream := lb.Downstream()
-	if len(downstream) == 0 || lb.Incoming == 0 {
+	if len(downstream) == 0 || incoming == 0.0 {
 		return
 	}
 
@@ -47,7 +50,7 @@ func (lb *LoadBalancer) Process() {
 	}
 
 	// Round-robin: distribute evenly across alive nodes
-	perNode := lb.Incoming / float64(len(alive))
+	perNode := incoming / float64(len(alive))
 	for _, node := range alive {
 		node.AddIncoming(perNode)
 	}
@@ -56,7 +59,7 @@ func (lb *LoadBalancer) Process() {
 // GetMetrics returns the current metrics for this load balancer.
 func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 	util := 0.0
-	if lb.throughput > 0 {
+	if lb.throughput > 0.0 {
 		util = 0.1 // always low since LB doesn't constrain
 	}
 	return NodeMetrics{

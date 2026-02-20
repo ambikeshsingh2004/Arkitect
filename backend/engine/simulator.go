@@ -72,6 +72,35 @@ func (s *Simulator) SetNodeDown(nodeID string, down bool) bool {
 	return true
 }
 
+// UpdateNodeConfig updates a node's configuration live during simulation.
+// Supports maxRPS and baseLatency for AppServer and Database nodes.
+func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency float64) bool {
+	node, ok := s.graph.Nodes[nodeID]
+	if !ok {
+		return false
+	}
+
+	switch n := node.(type) {
+	case *AppServer:
+		if maxRPS > 0 {
+			n.MaxRPS = maxRPS
+		}
+		if baseLatency > 0 {
+			n.BaseLatency = baseLatency
+		}
+	case *Database:
+		if maxRPS > 0 {
+			n.MaxRPS = maxRPS
+		}
+		if baseLatency > 0 {
+			n.BaseLatency = baseLatency
+		}
+	default:
+		return false
+	}
+	return true
+}
+
 // Start begins the simulation loop.
 func (s *Simulator) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -119,15 +148,10 @@ func (s *Simulator) tick() {
 
 	s.tickCount++
 
-	// 1. Reset all incoming
-	for _, node := range s.graph.Sorted {
-		node.ResetIncoming()
-	}
-
-	// 2. Inject traffic at entry node
+	// 1. Inject traffic at entry node
 	s.graph.EntryNode.AddIncoming(trafficRPS)
 
-	// 3. Process in topological order (BFS-like cascade)
+	// 2. Process in topological order (each node captures & resets its own incoming)
 	for _, node := range s.graph.Sorted {
 		node.Process()
 	}

@@ -188,6 +188,35 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "toggled"})
 
+	case "config":
+		session, ok := sessionMgr.Get(sessionID)
+		if !ok {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+		var body struct {
+			NodeID      string  `json:"nodeId"`
+			MaxRPS      float64 `json:"maxRPS,omitempty"`
+			BaseLatency float64 `json:"baseLatency,omitempty"`
+			RPS         float64 `json:"rps,omitempty"` // for client node traffic
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "Invalid body", http.StatusBadRequest)
+			return
+		}
+		// If RPS is set, update the simulator traffic
+		if body.RPS > 0 {
+			session.Simulator.SetTrafficRPS(body.RPS)
+		}
+		// Update node config (maxRPS, baseLatency)
+		if body.MaxRPS > 0 || body.BaseLatency > 0 {
+			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency) {
+				// Not an error for client/LB nodes — just skip
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
+
 	default:
 		http.Error(w, "Unknown action", http.StatusBadRequest)
 	}

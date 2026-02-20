@@ -9,11 +9,11 @@ import (
 
 // TickResult is the per-tick output sent to the frontend via WebSocket.
 type TickResult struct {
-	Tick       int           `json:"tick"`
-	Timestamp  int64         `json:"timestamp"`
-	Nodes      []NodeMetrics `json:"nodes"`
-	Bottleneck string        `json:"bottleneckId"`
-	TotalRPS   float64       `json:"totalRPS"`
+	Tick        int           `json:"tick"`
+	Timestamp   int64         `json:"timestamp"`
+	Nodes       []NodeMetrics `json:"nodes"`
+	Bottlenecks []string      `json:"bottleneckIds"`
+	TotalRPS    float64       `json:"totalRPS"`
 }
 
 // Simulator runs the tick-based simulation loop.
@@ -132,10 +132,10 @@ func (s *Simulator) tick() {
 		node.Process()
 	}
 
-	// 4. Collect metrics and detect bottleneck
+	// 4. Collect metrics and detect bottlenecks (all nodes above threshold)
 	metrics := make([]NodeMetrics, 0, len(s.graph.Sorted))
-	bottleneckID := ""
-	bestScore := -1.0
+	var bottleneckIDs []string
+	const bottleneckThreshold = 0.7
 
 	for _, node := range s.graph.Sorted {
 		m := node.GetMetrics()
@@ -148,20 +148,19 @@ func (s *Simulator) tick() {
 		}
 		score := m.Utilization + 0.3*math.Max(0, queueGrowth/math.Max(1, m.Throughput))
 
-		if score > bestScore && m.Type != "loadbalancer" && m.Type != "client" {
-			bestScore = score
-			bottleneckID = m.ID
+		if score > bottleneckThreshold && m.Type != "loadbalancer" && m.Type != "client" {
+			bottleneckIDs = append(bottleneckIDs, m.ID)
 		}
 
 		s.prevQueueDepth[m.ID] = m.QueueDepth
 	}
 
 	result := TickResult{
-		Tick:       s.tickCount,
-		Timestamp:  time.Now().UnixMilli(),
-		Nodes:      metrics,
-		Bottleneck: bottleneckID,
-		TotalRPS:   trafficRPS,
+		Tick:        s.tickCount,
+		Timestamp:   time.Now().UnixMilli(),
+		Nodes:       metrics,
+		Bottlenecks: bottleneckIDs,
+		TotalRPS:    trafficRPS,
 	}
 
 	// Non-blocking send

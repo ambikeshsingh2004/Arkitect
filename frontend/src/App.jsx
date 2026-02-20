@@ -49,7 +49,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [spikeOn, setSpikeOn] = useState(false);
-  const [bottleneckId, setBottleneckId] = useState(null);
+  const [bottleneckIds, setBottleneckIds] = useState([]);
   const [tickCount, setTickCount] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const wsRef = useRef(null);
@@ -171,7 +171,7 @@ function App() {
       ws.onmessage = (event) => {
         const tick = JSON.parse(event.data);
         setTickCount(tick.tick);
-        setBottleneckId(tick.bottleneckId);
+        setBottleneckIds(tick.bottleneckIds || []);
 
         // Update node data with metrics
         setNodes((nds) =>
@@ -241,7 +241,7 @@ function App() {
     }
     setIsRunning(false);
     setSessionId(null);
-    setBottleneckId(null);
+    setBottleneckIds([]);
     setTickCount(0);
 
     // Reset node metrics
@@ -383,10 +383,10 @@ function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {bottleneckId && (
+            {bottleneckIds.length > 0 && (
               <div className="flex items-center gap-2 text-xs bg-rose-500/10 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/20">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                Bottleneck: {bottleneckId}
+                Bottleneck: {bottleneckIds.join(', ')}
               </div>
             )}
             <button

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"arkitect/engine"
@@ -23,15 +24,49 @@ var (
 func main() {
 	mux := http.NewServeMux()
 
+	// API Routes
 	mux.HandleFunc("/api/simulate", handleSimulate)
 	mux.HandleFunc("/api/ws/", handleWebSocket)
 	mux.HandleFunc("/api/simulate/", handleSessionAction)
 
-	// CORS middleware
+	// Serve frontend static files
+	fs := http.FileServer(http.Dir("../frontend/dist"))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// If the request is for an API or WebSocket, let the mux handle it (already matched)
+		// Otherwise, check if the file exists in the static dir
+		if strings.HasPrefix(r.URL.Path, "/api") {
+			mux.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if the requested file exists
+		path := r.URL.Path
+		if path == "/" {
+			path = "/index.html"
+		}
+
+		// Try to serve the file
+		// Note: In a production Docker environment, the dist folder will be next to the binary
+		// We use a relative path that works both locally (if run from backend/) and in Docker
+		_, err := http.Dir("../frontend/dist").Open(path)
+		if err != nil {
+			// Fallback to index.html for SPA routing
+			http.ServeFile(w, r, "../frontend/dist/index.html")
+			return
+		}
+		fs.ServeHTTP(w, r)
+	}))
+
+	// CORS middleware (still useful for dev if needed)
 	handler := corsMiddleware(mux)
 
-	log.Println("Arkitect backend starting on :8080")
-	if err := http.ListenAndServe(":8080", handler); err != nil {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Arkitect starting as a single service on :%s\n", port)
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

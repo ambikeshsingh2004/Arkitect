@@ -361,7 +361,8 @@ function App() {
       setIsRunning(true);
 
       // Connect WebSocket
-      const ws = new WebSocket(`ws://${window.location.hostname}:8080/api/ws/${data.sessionId}`);
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws/${data.sessionId}`);
       wsRef.current = ws;
 
       ws.onmessage = (event) => {

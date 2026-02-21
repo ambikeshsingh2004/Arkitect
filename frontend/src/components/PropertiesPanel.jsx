@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Server, Database, Share2, Users, Power, PowerOff, Copy, Trash2, Split } from 'lucide-react';
+import { X, Server, Database, Share2, Users, Power, PowerOff, Copy, Trash2, Split, RefreshCcw } from 'lucide-react';
 
 const typeLabels = {
   client: 'Client',
@@ -25,7 +25,17 @@ const typeColors = {
   dbrouter: 'violet',
 };
 
-export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, onToggleDown, sessionId, onAddReplica, onRemoveNode }) {
+export default function PropertiesPanel({ 
+  node, 
+  onClose, 
+  onUpdate, 
+  isRunning, 
+  onToggleDown, 
+  sessionId, 
+  onAddReplica, 
+  onRemoveNode,
+  onResetQueues 
+}) {
   if (!node) return null;
 
   const color = typeColors[node.type] || 'slate';
@@ -106,23 +116,42 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
           />
         </FieldGroup>
 
-        {/* Client-specific: RPS */}
+        {/* Client-specific: RPS & ReadRatio */}
         {node.type === 'client' && (
-          <FieldGroup label="Requests per Second">
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min="10"
-                max="1000"
-                value={node.data.rps || 100}
-                onChange={(e) => handleChange('rps', Number(e.target.value))}
-                className="flex-1 accent-emerald-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                {node.data.rps || 100}
-              </span>
-            </div>
-          </FieldGroup>
+          <>
+            <FieldGroup label="Total Traffic (RPS)">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="10"
+                  max="2000"
+                  value={node.data.rps || 100}
+                  onChange={(e) => handleChange('rps', Number(e.target.value))}
+                  className="flex-1 accent-emerald-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
+                  {node.data.rps || 100}
+                </span>
+              </div>
+            </FieldGroup>
+            <FieldGroup label="Read/Write Ratio">
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] font-semibold uppercase">
+                  <span className="text-cyan-400">Reads: {((node.data.readRatio || 0.7) * 100).toFixed(0)}%</span>
+                  <span className="text-rose-400">Writes: {((1 - (node.data.readRatio || 0.7)) * 100).toFixed(0)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={node.data.readRatio || 0.7}
+                  onChange={(e) => handleChange('readRatio', Number(e.target.value))}
+                  className="w-full accent-cyan-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </FieldGroup>
+          </>
         )}
 
         {/* Server-specific: Max RPS & Base Latency */}
@@ -133,7 +162,7 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 <input
                   type="range"
                   min="10"
-                  max="500"
+                  max="2000"
                   value={node.data.maxRPS || 100}
                   onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
                   className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
@@ -158,21 +187,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 </span>
               </div>
             </FieldGroup>
-            <FieldGroup label="Concurrency Limit">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="1"
-                  max="50"
-                  value={node.data.concurrencyLimit || 10}
-                  onChange={(e) => handleChange('concurrencyLimit', Number(e.target.value))}
-                  className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.concurrencyLimit || 10}
-                </span>
-              </div>
-            </FieldGroup>
           </>
         )}
 
@@ -184,7 +198,7 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 <input
                   type="range"
                   min="10"
-                  max="300"
+                  max="1000"
                   value={node.data.maxRPS || 50}
                   onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
                   className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
@@ -209,21 +223,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 </span>
               </div>
             </FieldGroup>
-            <FieldGroup label="Concurrency Limit">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="1"
-                  max="50"
-                  value={node.data.concurrencyLimit || 5}
-                  onChange={(e) => handleChange('concurrencyLimit', Number(e.target.value))}
-                  className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.concurrencyLimit || 5}
-                </span>
-              </div>
-            </FieldGroup>
           </>
         )}
 
@@ -234,7 +233,7 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 <input
                   type="range"
                   min="50"
-                  max="2000"
+                  max="5000"
                   value={node.data.maxRPS || 500}
                   onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
                   className="flex-1 accent-blue-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
@@ -296,14 +295,38 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
         )}
 
         {/* Live Metrics (during simulation) */}
-        {isRunning && node.data.metrics && node.type !== 'client' && (
+        {isRunning && node.data.metrics && (
           <div className="mt-2">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Live Metrics</p>
-            <div className="grid grid-cols-2 gap-2">
-              <MetricCard label="Utilization" value={`${(node.data.metrics.utilization * 100).toFixed(0)}%`} />
-              <MetricCard label="Latency" value={`${node.data.metrics.latency?.toFixed(0)}ms`} />
-              <MetricCard label="Throughput" value={node.data.metrics.throughput?.toFixed(0)} />
-              <MetricCard label="Queue" value={node.data.metrics.queueDepth?.toFixed(0)} />
+            <div className={`grid ${node.type === 'client' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+              {node.type !== 'client' && <MetricCard label="Utilization" value={`${(node.data.metrics.utilization * 100).toFixed(0)}%`} />}
+              {node.type !== 'client' && <MetricCard label="Latency" value={`${node.data.metrics.latency?.toFixed(0)}ms`} />}
+              
+              {/* Effective Capacity Breakdown - only show if backend reports a limit > 0 */}
+              {node.type !== 'client' && node.data.metrics.effectiveCapacity > 0 && 
+               node.data.metrics.effectiveCapacity < (node.data.maxRPS || 100) && (
+                <div className="col-span-2 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 flex flex-col gap-1">
+                  <p className="text-rose-400 text-[9px] text-center font-bold uppercase tracking-tight">Active Capacity Limit</p>
+                  <div className="flex justify-between items-center px-4">
+                    <span className="text-slate-500 text-[10px]">Throttled to:</span>
+                    <span className="text-rose-400 font-mono font-bold text-xs">{node.data.metrics.effectiveCapacity?.toFixed(1)} <span className="text-[9px] opacity-70">rps</span></span>
+                  </div>
+                  <p className="text-[8px] text-slate-500 text-center italic">Value dropped due to Concurrency Limit and High Latency</p>
+                </div>
+              )}
+
+              {/* Read/Write Breakdown */}
+              <div className="col-span-2 bg-white/5 rounded-lg p-2 flex flex-col gap-1">
+                <p className="text-slate-500 text-[9px] text-center">Throughput (Read / Write)</p>
+                <div className="flex justify-between items-center px-4">
+                  <span className="text-cyan-400 font-mono font-bold text-xs">{node.data.metrics.readThroughput?.toFixed(0) || 0}</span>
+                  <div className="w-px h-3 bg-white/10" />
+                  <span className="text-rose-400 font-mono font-bold text-xs">{node.data.metrics.writeThroughput?.toFixed(0) || 0}</span>
+                </div>
+              </div>
+
+              {node.type !== 'client' && <MetricCard label="Queue Depth" value={node.data.metrics.queueDepth?.toFixed(0)} />}
+              
               {node.data.metrics.dropped > 0 && (
                 <MetricCard label="Total Dropped" value={node.data.metrics.dropped?.toFixed(0)} warn />
               )}
@@ -318,8 +341,7 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
 
       {/* Actions */}
       <div className="p-4 border-t border-white/5 flex flex-col gap-2">
-        {/* Add Replica — only for database nodes when not running */}
-        {!isRunning && node.type === 'database' && (
+        {node.type === 'database' && (
           <button
             onClick={() => onAddReplica(node.id)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25"
@@ -349,6 +371,17 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
           </div>
         )}
 
+        {/* Clear Queues — during simulation */}
+        {isRunning && (node.type === 'appserver' || node.type === 'database') && (
+          <button
+            onClick={onResetQueues}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+          >
+            <RefreshCcw className="w-4 h-4" />
+            Clear All Queues
+          </button>
+        )}
+
         {/* Remove node — only when not running */}
         {!isRunning && (
           <button
@@ -358,32 +391,6 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
             <Trash2 className="w-4 h-4" />
             Remove
           </button>
-        )}
-        {node.type === 'dbrouter' && (
-          <>
-            <FieldGroup label="Read/Write Split">
-              <div className="space-y-3">
-                <div className="flex justify-between text-[10px] uppercase tracking-wider font-semibold">
-                  <span className="text-cyan-400">Reads: {(node.data.readRatio * 100 || 70).toFixed(0)}%</span>
-                  <span className="text-rose-400">Writes: {((1 - (node.data.readRatio || 0.7)) * 100).toFixed(0)}%</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={node.data.readRatio || 0.7}
-                    onChange={(e) => handleChange('readRatio', Number(e.target.value))}
-                    className="flex-1 accent-cyan-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-                <p className="text-[9px] text-slate-500 leading-tight">
-                  Adjust the portion of traffic directed to Read Replicas vs Primaries.
-                </p>
-              </div>
-            </FieldGroup>
-          </>
         )}
       </div>
     </div>

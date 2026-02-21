@@ -59,13 +59,29 @@ function LoadBalancerNode({ data }) {
       {status !== 'idle' && (
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-white/5 rounded-lg p-2 text-center flex flex-col gap-0.5 col-span-2 text-center">
+              <p className="text-slate-500 text-[9px]">Arrival (Read / Write)</p>
+              <div className="flex justify-between items-center px-4">
+                <span className="text-cyan-400 font-mono font-bold text-xs">{data.metrics?.arrivalRead?.toFixed(0) || 0}</span>
+                <div className="w-px h-3 bg-white/10" />
+                <span className="text-rose-400 font-mono font-bold text-xs">{data.metrics?.arrivalWrite?.toFixed(0) || 0}</span>
+              </div>
+            </div>
+            <div className="bg-white/5 rounded-lg p-2 text-center flex flex-col gap-0.5 col-span-2 text-center">
+              <p className="text-slate-500 text-[9px]">Throughput (Read / Write)</p>
+              <div className="flex justify-between items-center px-4">
+                <span className="text-cyan-400 font-mono font-bold text-xs">{data.metrics?.readThroughput?.toFixed(0) || 0}</span>
+                <div className="w-px h-3 bg-white/10" />
+                <span className="text-rose-400 font-mono font-bold text-xs">{data.metrics?.writeThroughput?.toFixed(0) || 0}</span>
+              </div>
+            </div>
             <div className="bg-white/5 rounded-lg p-2 text-center">
-              <p className="text-slate-500 text-[10px]">Throughput</p>
-              <p className="text-blue-400 font-mono font-bold">{throughput.toFixed(0)}</p>
+              <p className="text-slate-500 text-[10px]">Total RPS</p>
+              <p className="text-blue-400 font-mono font-bold text-xs">{throughput.toFixed(0)}</p>
             </div>
             <div className="bg-white/5 rounded-lg p-2 text-center">
               <p className="text-slate-500 text-[10px]">Util %</p>
-              <p className="text-blue-400 font-mono font-bold">{(utilization * 100).toFixed(0)}%</p>
+              <p className="text-blue-400 font-mono font-bold text-xs">{(utilization * 100).toFixed(0)}%</p>
             </div>
           </div>
 

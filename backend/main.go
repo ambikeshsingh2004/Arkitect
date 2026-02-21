@@ -223,8 +223,8 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		if body.IsReplica != nil {
 			ir = *body.IsReplica
 		}
-		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.BackpressureEnabled != nil || body.BackpressureThreshold > 0 || body.Algorithm != "" || body.ReadRatio > 0 || body.ConcurrencyLimit > 0 || body.IsReplica != nil {
-			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.BackpressureThreshold, body.ReadRatio, body.ConcurrencyLimit, bp, ir, body.Algorithm) {
+		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.BackpressureEnabled != nil || body.BackpressureThreshold > 0 || body.Algorithm != "" || body.ReadRatio > 0 || body.ConcurrencyLimit > 0 || body.IsReplica != nil || body.RPS > 0 {
+			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.BackpressureThreshold, body.ReadRatio, body.ConcurrencyLimit, body.RPS, bp, ir, body.Algorithm) {
 				// Not an error for client/LB nodes — just skip
 			}
 		}
@@ -242,6 +242,14 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid body", http.StatusBadRequest)
 			return
 		}
+
+		// Debug log
+		log.Printf("Simulation Update: NodeCount=%d", len(config.Nodes))
+		for _, n := range config.Nodes {
+			if n.Type == "client" {
+				log.Printf("  Client node found: %s, RPS=%.1f", n.ID, n.RPS)
+			}
+		}
 		newGraph, err := engine.BuildGraphFromConfig(&config)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Failed to rebuild graph: %v", err), http.StatusBadRequest)
@@ -249,7 +257,17 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		}
 		session.Simulator.UpdateGraph(newGraph)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
+		json.NewEncoder(w).Encode(map[string]string{"status": "graph_updated"})
+
+	case "reset-queues":
+		session, ok := sessionMgr.Get(sessionID)
+		if !ok {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+		session.Simulator.ResetQueues()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "queues_reset"})
 
 	default:
 		http.Error(w, "Unknown action", http.StatusBadRequest)

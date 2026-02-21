@@ -12,6 +12,7 @@ type NodeConfig struct {
 	ID                    string  `json:"id"`
 	Type                  string  `json:"type"`
 	Label                 string  `json:"label"`
+	RPS                   float64 `json:"rps,omitempty"`
 	MaxRPS                float64 `json:"maxRPS,omitempty"`
 	BaseLatency           float64 `json:"baseLatency,omitempty"`
 	IsReplica             bool    `json:"isReplica,omitempty"`
@@ -66,7 +67,12 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 		var node Node
 		switch nc.Type {
 		case "client":
-			node = NewClient(nc.ID, nc.Label)
+			c := NewClient(nc.ID, nc.Label)
+			c.RPS = nc.RPS
+			if nc.ReadRatio > 0 {
+				c.ReadRatio = nc.ReadRatio
+			}
+			node = c
 		case "loadbalancer":
 			maxRPS := nc.MaxRPS
 			if maxRPS == 0 {

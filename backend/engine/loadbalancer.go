@@ -1,10 +1,15 @@
 package engine
 
+import "math"
+
 // LoadBalancer distributes incoming traffic across downstream nodes using Round Robin.
 // DOWN nodes are excluded from routing, causing traffic redistribution.
 type LoadBalancer struct {
 	BaseNode
 	throughput            float64
+	readTP                float64
+	writeTP               float64
+	utilization           float64
 	CapacityRPS           float64
 	BackpressureEnabled   bool
 	BackpressureThreshold float64
@@ -33,23 +38,35 @@ func NewLoadBalancer(id, label string) *LoadBalancer {
 func (lb *LoadBalancer) Process() {
 	if lb.Down {
 		lb.throughput = 0
-		lb.Incoming = 0 // consume incoming
+		lb.ResetIncoming()
 		return
 	}
 
-	incoming := lb.Incoming
-	lb.Incoming = 0
-	lb.currentDropped = 0 // Reset per tick
+	inRead := lb.IncomingRead
+	inWrite := lb.IncomingWrite
+	inTotal := lb.Incoming + inRead + inWrite
+	lb.ResetIncoming()
 
-	// Initial cap: Load Balancer self-capacity
-	effectiveIncoming := incoming
-	if lb.CapacityRPS > 0 && incoming > lb.CapacityRPS {
-		effectiveIncoming = lb.CapacityRPS
+	// Proportional split if generic traffic exists
+	if lb.Incoming > 0 && inRead == 0 && inWrite == 0 {
+		inRead = inTotal * 0.7
+		inWrite = inTotal * 0.3
 	}
 
-	lb.throughput = effectiveIncoming
+	// Initial cap: Load Balancer self-capacity
+	processed := math.Min(inTotal, lb.CapacityRPS)
+	// Force integer throughput for UI consistency
+	lb.throughput = math.Floor(processed + 0.5)
+
+	// Proportional split for throughput metrics (derived from integer total)
+	if inTotal > 0 {
+		ratio := lb.throughput / inTotal
+		lb.readTP = inRead * ratio
+		lb.writeTP = inWrite * ratio
+	}
+
 	downstream := lb.Downstream()
-	if len(downstream) == 0 || effectiveIncoming == 0.0 {
+	if len(downstream) == 0 || processed == 0.0 {
 		return
 	}
 
@@ -62,74 +79,83 @@ func (lb *LoadBalancer) Process() {
 	}
 
 	if len(alive) == 0 {
-		lb.currentDropped = incoming
-		lb.totalDropped += incoming
+		lb.currentDropped = inTotal
+		lb.totalDropped += inTotal
 		return
 	}
 
-	// Calculate pool capacity for backpressure
-	totalPoolCapacity := 0.0
-	for _, node := range alive {
-		totalPoolCapacity += node.MaxRPS()
-	}
+	// Distribution with Primary/Replica awareness and Capacity-Weighting
+	if processed > 0 {
+		var primaries []Node
+		dedupMap := make(map[string]bool)
 
-	// Final cap: Backpressure (XY% pool capacity shield)
-	if lb.BackpressureEnabled && totalPoolCapacity > 0 {
-		threshold := lb.BackpressureThreshold
-		if threshold <= 0 {
-			threshold = 0.9 // default fallback
-		}
-		poolCap := totalPoolCapacity * threshold
-		if effectiveIncoming > poolCap {
-			effectiveIncoming = poolCap
-		}
-	}
+		var uniqueAlive []Node
+		for _, n := range alive {
+			if !dedupMap[n.ID()] {
+				dedupMap[n.ID()] = true
+				uniqueAlive = append(uniqueAlive, n)
 
-	// Calculate total drops (Self-Cap drop + Backpressure drop)
-	dropped := incoming - effectiveIncoming
-	if dropped > 0 {
-		lb.currentDropped = dropped
-		lb.totalDropped += dropped
-	}
-
-	if effectiveIncoming <= 0 {
-		return
-	}
-
-	// 3. Distribution based on Algorithm
-	switch lb.Algorithm {
-	case "weighted":
-		if totalPoolCapacity > 0 {
-			for _, node := range alive {
-				share := effectiveIncoming * (node.MaxRPS() / totalPoolCapacity)
-				node.AddIncoming(share)
-			}
-		} else {
-			perNode := effectiveIncoming / float64(len(alive))
-			for _, node := range alive {
-				node.AddIncoming(perNode)
+				if db, ok := n.(*Database); ok {
+					if !db.IsReplica {
+						primaries = append(primaries, n)
+					}
+				} else {
+					primaries = append(primaries, n)
+				}
 			}
 		}
 
-	case "round-robin":
-		if lb.rrIndex >= len(alive) {
-			lb.rrIndex = 0
-		}
-		alive[lb.rrIndex].AddIncoming(effectiveIncoming)
-		lb.rrIndex = (lb.rrIndex + 1) % len(alive)
+		distribute := func(total float64, targets []Node, isWrite bool) {
+			if len(targets) == 0 {
+				return
+			}
 
-	default: // Default to Weighted (User's specific request for capacity-based)
-		if totalPoolCapacity > 0 {
-			for _, node := range alive {
-				share := effectiveIncoming * (node.MaxRPS() / totalPoolCapacity)
-				node.AddIncoming(share)
+			totalInt := int(math.Floor(total + 0.5))
+			if totalInt == 0 {
+				return
 			}
-		} else {
-			perNode := effectiveIncoming / float64(len(alive))
-			for _, node := range alive {
-				node.AddIncoming(perNode)
+
+			// Calculate weights by capacity
+			var totalCap float64
+			for _, n := range targets {
+				totalCap += math.Max(1.0, n.MaxRPS())
+			}
+
+			remaining := totalInt
+			for i, n := range targets {
+				var val int
+				if i == len(targets)-1 {
+					val = remaining
+				} else {
+					share := (math.Max(1.0, n.MaxRPS()) / totalCap) * float64(totalInt)
+					val = int(math.Floor(share + 0.5))
+					if val > remaining {
+						val = remaining
+					}
+				}
+
+				if isWrite {
+					n.AddIncomingWrite(float64(val))
+				} else {
+					n.AddIncomingRead(float64(val))
+				}
+				remaining -= val
 			}
 		}
+
+		// Forward WRITEs to Primaries only
+		writeTargets := primaries
+		if len(writeTargets) == 0 {
+			writeTargets = uniqueAlive
+		}
+		distribute(lb.writeTP, writeTargets, true)
+
+		// Forward READs to ALL healthy (unique) nodes
+		distribute(lb.readTP, uniqueAlive, false)
+	}
+
+	if lb.CapacityRPS > 0 {
+		lb.utilization = math.Min(inTotal/lb.CapacityRPS, 1.0)
 	}
 }
 
@@ -165,16 +191,26 @@ func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 	if lb.currentDropped > 0 {
 		status = "rejecting"
 	}
+	lat := lb.CurrentLatency()
 	return NodeMetrics{
-		ID:          lb.NodeID,
-		Type:        lb.NodeType,
-		Label:       lb.NodeLabel,
-		Utilization: util,
-		Latency:     0.5, // negligible routing latency
-		QueueDepth:  0,
-		Throughput:  lb.throughput,
-		Dropped:     lb.totalDropped,
-		DropRate:    lb.currentDropped,
-		Status:      status,
+		ID:              lb.NodeID,
+		Type:            lb.NodeType,
+		Label:           lb.NodeLabel,
+		Utilization:     util,
+		Latency:         lat,
+		QueueDepth:      0,
+		ReadThroughput:  lb.readTP,
+		WriteThroughput: lb.writeTP,
+		Throughput:      lb.throughput,
+		Dropped:         lb.totalDropped,
+		DropRate:        lb.currentDropped,
+		Status:          status,
+		ArrivalRead:     lb.lastArrivalR,
+		ArrivalWrite:    lb.lastArrivalW,
+		ArrivalTotal:    lb.lastArrivalT,
 	}
+}
+func (lb *LoadBalancer) ResetQueues() {
+	lb.throughput = 0
+	lb.currentDropped = 0
 }

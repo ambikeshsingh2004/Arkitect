@@ -80,13 +80,17 @@ function DatabaseNode({ data }) {
               <p className="text-slate-500 text-[9px]">Latency</p>
               <p className="text-rose-400 font-mono font-bold text-[11px]">{latency.toFixed(0)}ms</p>
             </div>
-            <div className="bg-white/5 rounded-lg p-1.5 text-center">
-              <p className="text-slate-500 text-[9px]">QPS</p>
-              <p className="text-rose-400 font-mono font-bold text-[11px]">{throughput.toFixed(0)}</p>
+            <div className="bg-white/5 rounded-lg p-1.5 text-center flex flex-col gap-0.5">
+              <p className="text-slate-500 text-[8px]">Arrival (R / W)</p>
+              <div className="flex justify-between items-center px-0.5">
+                <span className="text-cyan-400 font-mono font-bold text-[9px]">{data.metrics?.arrivalRead?.toFixed(0) || 0}</span>
+                <span className="text-white/20 text-[8px]">/</span>
+                <span className="text-rose-400 font-mono font-bold text-[9px]">{data.metrics?.arrivalWrite?.toFixed(0) || 0}</span>
+              </div>
             </div>
             <div className="bg-white/5 rounded-lg p-1.5 text-center">
-              <p className="text-slate-500 text-[9px]">Queue</p>
-              <p className="text-rose-400 font-mono font-bold text-[11px]">{queueDepth.toFixed(0)}</p>
+              <p className="text-slate-500 text-[8px]">Queue</p>
+              <p className="text-rose-400 font-mono font-bold text-[10px]">{queueDepth.toFixed(0)}</p>
             </div>
           </div>
         </>

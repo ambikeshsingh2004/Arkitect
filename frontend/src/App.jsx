@@ -39,10 +39,10 @@ const defaultEdgeOptions = {
 
 // Default data per node type
 const defaultNodeData = {
-  client: { rps: 100 },
-  loadbalancer: { algorithm: 'round-robin', backpressureEnabled: false },
-  appserver: { maxRPS: 100, baseLatency: 20, concurrencyLimit: 10 },
-  database: { maxRPS: 50, baseLatency: 50, concurrencyLimit: 5 },
+  client: { rps: 100, readRatio: 0.7 },
+  loadbalancer: { algorithm: 'round-robin', maxRPS: 1000, backpressureEnabled: false },
+  appserver: { maxRPS: 200, baseLatency: 20, concurrencyLimit: 0 },
+  database: { maxRPS: 100, baseLatency: 50, concurrencyLimit: 0 },
   dbrouter: { readRatio: 0.7 },
 };
 
@@ -159,11 +159,21 @@ function App() {
 
     setNodes((nds) => {
       const nextNodes = nds.concat(newNode);
+      const nextEdges = edges.concat(newEdges);
       if (isRunning && sessionId) syncSimulation(nextNodes, nextEdges);
       return nextNodes;
     });
     setEdges((eds) => eds.concat(newEdges));
   }, [nodes, edges, isRunning, sessionId]);
+
+  const resetQueues = useCallback(async () => {
+    if (!isRunning || !sessionId) return;
+    try {
+      await fetch(`/api/simulate/${sessionId}/reset-queues`, { method: 'POST' });
+    } catch (err) {
+      console.error('Failed to reset queues:', err);
+    }
+  }, [isRunning, sessionId]);
 
   // Sync current architecture to living backend session
   const syncSimulation = async (currentNodes, currentEdges) => {
@@ -182,7 +192,8 @@ function App() {
         backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
-        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 10 : n.type === 'database' ? 5 : 0),
+        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
+        rps: n.data.rps || (n.type === 'client' ? 100 : 0),
       })),
       edges: currentEdges.map((e) => ({
         source: e.source,
@@ -248,24 +259,58 @@ function App() {
         dbrouter: 'DB Router',
       };
 
-      const newNode = {
-        id: getId(),
-        type,
-        position,
-        data: {
-          label: `${labelMap[type]} ${nodeId}`,
-          metrics: null,
-          ...defaultNodeData[type],
-        },
-      };
+      if (type === 'database') {
+        const primaryId = getId();
+        const primaryNode = {
+          id: primaryId,
+          type: 'database',
+          position,
+          data: {
+            label: `Primary DB ${primaryId.split('_')[1]}`,
+            metrics: null,
+            ...defaultNodeData.database,
+            isReplica: false,
+          },
+        };
 
-      setNodes((nds) => {
-        const nextNodes = nds.concat(newNode);
-        if (isRunning && sessionId) {
-          syncSimulation(nextNodes, edges);
-        }
-        return nextNodes;
-      });
+        const replicaId = getId();
+        const replicaNode = {
+          id: replicaId,
+          type: 'database',
+          position: { x: position.x + 220, y: position.y },
+          data: {
+            label: `Read Replica ${replicaId.split('_')[1]}`,
+            metrics: null,
+            ...defaultNodeData.database,
+            isReplica: true,
+          },
+        };
+
+        setNodes((nds) => {
+          const nextNodes = nds.concat(primaryNode, replicaNode);
+          if (isRunning && sessionId) syncSimulation(nextNodes, edges);
+          return nextNodes;
+        });
+      } else {
+        const newNode = {
+          id: getId(),
+          type,
+          position,
+          data: {
+            label: `${labelMap[type]} ${nodeId}`,
+            metrics: null,
+            ...defaultNodeData[type],
+          },
+        };
+
+        setNodes((nds) => {
+          const nextNodes = nds.concat(newNode);
+          if (isRunning && sessionId) {
+            syncSimulation(nextNodes, edges);
+          }
+          return nextNodes;
+        });
+      }
     },
     [reactFlowInstance, isRunning, sessionId, edges]
   );
@@ -286,7 +331,8 @@ function App() {
         backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
-        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 10 : n.type === 'database' ? 5 : 0),
+        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
+        rps: n.data.rps || (n.type === 'client' ? 100 : 0),
       })),
       edges: edges.map((e) => ({
         source: e.source,
@@ -318,23 +364,10 @@ function App() {
         // Update node data with metrics
         setNodes((nds) =>
           nds.map((node) => {
-            if (node.type === 'client') {
-              // Sync client RPS from backend's actual traffic value
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  rps: tick.totalRPS || node.data.rps || 100,
-                  metrics: { throughput: tick.totalRPS || node.data.rps || 100 },
-                },
-              };
-            }
             const metrics = tick.nodes.find((m) => m.id === node.id);
             if (metrics) {
-              return {
-                ...node,
-                data: { ...node.data, metrics, isReplica: node.data.isReplica },
-              };
+              const updatedData = { ...node.data, metrics };
+              return { ...node, data: updatedData };
             }
             return node;
           })
@@ -609,6 +642,7 @@ function App() {
           sessionId={sessionId}
           onAddReplica={addReplica}
           onRemoveNode={removeNode}
+          onResetQueues={resetQueues}
         />
       )}
     </div>

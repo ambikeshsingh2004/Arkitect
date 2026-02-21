@@ -29,9 +29,25 @@ function ClientNode({ data }) {
         </div>
       </div>
 
-      <div className="bg-white/5 rounded-lg p-2 text-center">
-        <p className="text-slate-500 text-[10px]">Sending</p>
-        <p className="text-emerald-400 font-mono font-bold text-sm">{rps} <span className="text-[10px] text-slate-500">rps</span></p>
+      <div className="bg-white/5 rounded-lg p-2 flex flex-col gap-1.5">
+        <div className="flex justify-between items-center">
+          <p className="text-slate-500 text-[9px]">Total</p>
+          <p className="text-emerald-400 font-mono font-bold text-xs">{rps} <span className="text-[10px] text-slate-500">rps</span></p>
+        </div>
+        
+        {data.metrics && (
+          <div className="flex gap-2 pt-1 border-t border-white/5">
+            <div className="flex-1 text-center">
+              <p className="text-[8px] text-cyan-400 font-semibold uppercase">Read</p>
+              <p className="text-[9px] font-mono text-slate-300">{data.metrics.readThroughput?.toFixed(0) || 0}</p>
+            </div>
+            <div className="w-px bg-white/5" />
+            <div className="flex-1 text-center">
+              <p className="text-[8px] text-rose-400 font-semibold uppercase">Write</p>
+              <p className="text-[9px] font-mono text-slate-300">{data.metrics.writeThroughput?.toFixed(0) || 0}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -74,13 +75,20 @@ func (s *Simulator) SetNodeDown(nodeID string, down bool) bool {
 
 // UpdateNodeConfig updates a node's configuration live during simulation.
 // Supports maxRPS, baseLatency, and backpressure for relevant nodes.
-func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, threshold, readRatio, concurrency float64, backpressure, isReplica bool, algorithm string) bool {
+func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, threshold, readRatio, concurrency, rps float64, backpressure, isReplica bool, algorithm string) bool {
 	node, ok := s.graph.Nodes[nodeID]
 	if !ok {
 		return false
 	}
 
 	switch n := node.(type) {
+	case *Client:
+		if rps > 0 {
+			n.RPS = rps
+		}
+		if readRatio > 0 {
+			n.ReadRatio = readRatio
+		}
 	case *AppServer:
 		if maxRPS > 0 {
 			n.CapacityRPS = maxRPS
@@ -121,6 +129,15 @@ func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, thresho
 		return false
 	}
 	return true
+}
+
+// ResetQueues clears all backlogs/queues in the entire graph.
+func (s *Simulator) ResetQueues() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, node := range s.graph.Nodes {
+		node.ResetQueues()
+	}
 }
 
 // UpdateGraph replaces the current simulation graph with a new one.
@@ -178,8 +195,19 @@ func (s *Simulator) tick() {
 
 	s.tickCount++
 
-	// 1. Inject traffic at entry node
-	s.graph.EntryNode.AddIncoming(trafficRPS)
+	// 1. Inject traffic at all client nodes
+	clientCount := 0
+	for _, node := range s.graph.Nodes {
+		if node.Type() == "client" {
+			if client, ok := node.(*Client); ok {
+				client.AddIncoming(client.RPS)
+				clientCount++
+			}
+		}
+	}
+	if s.tickCount%10 == 0 {
+		fmt.Printf("Tick %d: Injected into %d clients (s.trafficRPS=%.1f)\n", s.tickCount, clientCount, trafficRPS)
+	}
 
 	// 2. Process in topological order (each node captures & resets its own incoming)
 	for _, node := range s.graph.Sorted {

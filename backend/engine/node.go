@@ -2,16 +2,22 @@ package engine
 
 // NodeMetrics holds the real-time metrics for a single node.
 type NodeMetrics struct {
-	ID          string  `json:"id"`
-	Type        string  `json:"type"`
-	Label       string  `json:"label"`
-	Utilization float64 `json:"utilization"`
-	Latency     float64 `json:"latency"`
-	QueueDepth  float64 `json:"queueDepth"`
-	Throughput  float64 `json:"throughput"`
-	Dropped     float64 `json:"dropped"`
-	DropRate    float64 `json:"dropRate"`
-	Status      string  `json:"status"` // "healthy", "stressed", "overloaded", "down"
+	ID                string  `json:"id"`
+	Type              string  `json:"type"`
+	Label             string  `json:"label"`
+	Utilization       float64 `json:"utilization"`
+	Latency           float64 `json:"latency"`
+	QueueDepth        float64 `json:"queueDepth"`
+	ReadThroughput    float64 `json:"readThroughput"`
+	WriteThroughput   float64 `json:"writeThroughput"`
+	Throughput        float64 `json:"throughput"`
+	Dropped           float64 `json:"dropped"`
+	DropRate          float64 `json:"dropRate"`
+	Status            string  `json:"status"` // "healthy", "stressed", "overloaded", "down"
+	ArrivalRead       float64 `json:"arrivalRead"`
+	ArrivalWrite      float64 `json:"arrivalWrite"`
+	ArrivalTotal      float64 `json:"arrivalTotal"`
+	EffectiveCapacity float64 `json:"effectiveCapacity"`
 }
 
 // Node is the common interface for all simulation nodes.
@@ -21,6 +27,8 @@ type Node interface {
 	Label() string
 	Process()
 	AddIncoming(rps float64)
+	AddIncomingRead(rps float64)
+	AddIncomingWrite(rps float64)
 	ResetIncoming()
 	GetMetrics() NodeMetrics
 	SetDownstream(nodes []Node)
@@ -29,6 +37,7 @@ type Node interface {
 	IsDown() bool
 	MaxRPS() float64
 	CurrentLatency() float64
+	ResetQueues()
 }
 
 // ---- Base node with shared fields ----
@@ -40,18 +49,34 @@ type BaseNode struct {
 	NodeLabel       string
 	DownstreamNodes []Node
 	Incoming        float64
+	IncomingRead    float64
+	IncomingWrite   float64
 	Down            bool // UP/DOWN status
+	lastArrivalR    float64
+	lastArrivalW    float64
+	lastArrivalT    float64
 }
 
-func (b *BaseNode) ID() string                 { return b.NodeID }
-func (b *BaseNode) Type() string               { return b.NodeType }
-func (b *BaseNode) Label() string              { return b.NodeLabel }
-func (b *BaseNode) AddIncoming(rps float64)    { b.Incoming += rps }
-func (b *BaseNode) ResetIncoming()             { b.Incoming = 0 }
+func (b *BaseNode) ID() string                   { return b.NodeID }
+func (b *BaseNode) Type() string                 { return b.NodeType }
+func (b *BaseNode) Label() string                { return b.NodeLabel }
+func (b *BaseNode) AddIncoming(rps float64)      { b.Incoming += rps }
+func (b *BaseNode) AddIncomingRead(rps float64)  { b.IncomingRead += rps }
+func (b *BaseNode) AddIncomingWrite(rps float64) { b.IncomingWrite += rps }
+func (b *BaseNode) ResetIncoming() {
+	b.lastArrivalR = b.IncomingRead
+	b.lastArrivalW = b.IncomingWrite
+	b.lastArrivalT = b.Incoming + b.IncomingRead + b.IncomingWrite
+
+	b.Incoming = 0
+	b.IncomingRead = 0
+	b.IncomingWrite = 0
+}
 func (b *BaseNode) SetDownstream(nodes []Node) { b.DownstreamNodes = nodes }
 func (b *BaseNode) Downstream() []Node         { return b.DownstreamNodes }
 func (b *BaseNode) SetDown(down bool)          { b.Down = down }
 func (b *BaseNode) IsDown() bool               { return b.Down }
+func (b *BaseNode) ResetQueues()               {} // Base does nothing
 
 // StatusFromUtilization returns a health status string.
 // It considers both utilization and queue depth for a realistic assessment:
@@ -63,9 +88,9 @@ func StatusFromUtilization(u float64, queueDepth float64, isDown bool) string {
 		return "down"
 	}
 	switch {
-	case queueDepth > 0 && u >= 0.85:
+	case queueDepth > 50 || u >= 0.99:
 		return "overloaded"
-	case u >= 0.70:
+	case queueDepth > 0 || u >= 0.70:
 		return "stressed"
 	default:
 		return "healthy"

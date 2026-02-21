@@ -6,48 +6,57 @@ function DBRouterNode({ data }) {
   const status = data.metrics?.status || 'idle';
   const throughput = data.metrics?.throughput || 0;
 
-  const handleClass = "!w-2.5 !h-2.5 !bg-violet-500 !border-2 !border-[#0a0a0c]";
+  const handleClass = "!w-3 !h-3 !bg-violet-500 !border-2 !border-[#050507] hover:!scale-125 transition-transform";
+
+  const auraColors = {
+    active: 'bg-violet-500/10',
+    down: 'bg-rose-500/15',
+    idle: 'bg-slate-500/5',
+  };
+
+  const currentStatus = status === 'down' ? 'down' : status === 'idle' ? 'idle' : 'active';
 
   return (
-    <div className={`node-card border-2 min-w-[170px] border-violet-500/40 shadow-violet-500/10 hover:scale-[1.02]`}>
+    <div className={`node-card group min-w-[180px] shadow-2xl ${status === 'down' ? 'node-down' : ''}`}>
+      <div className={`status-aura ${auraColors[currentStatus]}`} />
+      
       <Handle type="target" position={Position.Left} className={handleClass} />
       <Handle type="source" position={Position.Right} className={handleClass} />
 
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 rounded-lg bg-violet-500/15 text-violet-400">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20 group-hover:rotate-12 transition-transform duration-500">
           <Split className="w-4 h-4" />
         </div>
-        <div className="flex-1">
-          <p className="text-xs font-semibold text-white">{data.label || 'DB Router'}</p>
-          <p className="text-[9px] text-slate-500 uppercase tracking-wider">Read/Write Split</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className={`w-2 h-2 rounded-full ${status === 'down' ? 'bg-rose-500' : 'bg-violet-500'} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
-          {status !== 'idle' && (
-            <span className={`text-[7px] font-bold px-1 py-0.5 rounded border ${
-              status === 'down' ? 'text-rose-400 border-rose-500/30' : 'text-violet-400 border-violet-500/30'
-            }`}>
-              {status === 'down' ? 'DOWN' : 'ACTIVE'}
-            </span>
-          )}
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-black text-white truncate leading-none mb-1 uppercase tracking-tight">{data.label || 'DB Router'}</p>
+          <div className="flex items-center gap-1.5 leading-none">
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest leading-none">Traffic Splitter</span>
+            <div className={`w-1.5 h-1.5 rounded-full ${status === 'down' ? 'bg-rose-500' : 'bg-violet-500'} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <div className="bg-white/5 rounded-lg p-2 flex justify-between items-center">
-          <span className="text-[10px] text-orange-400 font-medium">WRITE (30%)</span>
-          <span className="text-[10px] text-orange-400 font-mono">Primary</span>
+      <div className="bg-white/[0.03] rounded-2xl p-3 border border-white/5 space-y-2">
+        <div className="flex justify-between items-center bg-orange-400/5 p-2 rounded-xl border border-orange-400/10 transition-colors hover:bg-orange-400/10">
+          <span className="text-[10px] text-orange-400 font-black uppercase tracking-widest">Write (30%)</span>
+          <span className="text-[9px] text-orange-400/60 font-black uppercase tracking-tighter">Primary</span>
         </div>
-        <div className="bg-white/5 rounded-lg p-2 flex justify-between items-center">
-          <span className="text-[10px] text-cyan-400 font-medium">READ (70%)</span>
-          <span className="text-[10px] text-cyan-400 font-mono">Replicas</span>
+        <div className="flex justify-between items-center bg-cyan-400/5 p-2 rounded-xl border border-cyan-400/10 transition-colors hover:bg-cyan-400/10">
+          <span className="text-[10px] text-cyan-400 font-black uppercase tracking-widest">Read (70%)</span>
+          <span className="text-[9px] text-cyan-400/60 font-black uppercase tracking-tighter">Replicas</span>
         </div>
       </div>
 
-      {status !== 'idle' && (
-        <div className="mt-3 bg-violet-500/10 rounded-lg p-1.5 text-center border border-violet-500/20">
-          <p className="text-slate-500 text-[9px]">Total Throughput</p>
-          <p className="text-violet-400 font-mono font-bold text-[11px]">{throughput.toFixed(0)} rps</p>
+      {status !== 'idle' ? (
+        <div className="mt-4 pt-3 border-t border-white/5 text-center">
+          <p className="text-slate-500 text-[8px] font-bold uppercase tracking-widest mb-0.5">Aggregated Flow</p>
+          <p className="text-violet-400 font-black text-sm tabular-nums tracking-tight">
+            {throughput.toFixed(0)} <span className="text-[10px] opacity-60">rps</span>
+          </p>
+        </div>
+      ) : (
+        <div className="py-4 text-center">
+          <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest opacity-40">Standby Mode</p>
         </div>
       )}
     </div>

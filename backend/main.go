@@ -195,16 +195,14 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var body struct {
-			NodeID                string  `json:"nodeId"`
-			MaxRPS                float64 `json:"maxRPS,omitempty"`
-			BaseLatency           float64 `json:"baseLatency,omitempty"`
-			RPS                   float64 `json:"rps,omitempty"` // for client node traffic
-			BackpressureEnabled   *bool   `json:"backpressureEnabled,omitempty"`
-			BackpressureThreshold float64 `json:"backpressureThreshold,omitempty"`
-			Algorithm             string  `json:"algorithm,omitempty"`
-			ReadRatio             float64 `json:"readRatio,omitempty"`
-			ConcurrencyLimit      float64 `json:"concurrencyLimit,omitempty"`
-			IsReplica             *bool   `json:"isReplica,omitempty"`
+			NodeID           string  `json:"nodeId"`
+			MaxRPS           float64 `json:"maxRPS,omitempty"`
+			BaseLatency      float64 `json:"baseLatency,omitempty"`
+			RPS              float64 `json:"rps,omitempty"` // for client node traffic
+			Algorithm        string  `json:"algorithm,omitempty"`
+			ReadRatio        float64 `json:"readRatio,omitempty"`
+			ConcurrencyLimit float64 `json:"concurrencyLimit,omitempty"`
+			IsReplica        *bool   `json:"isReplica,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -214,17 +212,12 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		if body.RPS > 0 {
 			session.Simulator.SetTrafficRPS(body.RPS)
 		}
-		// Update node config (maxRPS, baseLatency, backpressure)
-		bp := false
-		if body.BackpressureEnabled != nil {
-			bp = *body.BackpressureEnabled
-		}
 		ir := false
 		if body.IsReplica != nil {
 			ir = *body.IsReplica
 		}
-		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.BackpressureEnabled != nil || body.BackpressureThreshold > 0 || body.Algorithm != "" || body.ReadRatio > 0 || body.ConcurrencyLimit > 0 || body.IsReplica != nil || body.RPS > 0 {
-			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.BackpressureThreshold, body.ReadRatio, body.ConcurrencyLimit, body.RPS, bp, ir, body.Algorithm) {
+		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.Algorithm != "" || body.ReadRatio > 0 || body.ConcurrencyLimit > 0 || body.IsReplica != nil || body.RPS > 0 {
+			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.ReadRatio, body.ConcurrencyLimit, body.RPS, ir, body.Algorithm) {
 				// Not an error for client/LB nodes — just skip
 			}
 		}

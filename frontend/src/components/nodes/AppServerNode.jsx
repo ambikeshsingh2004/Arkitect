@@ -23,70 +23,83 @@ function AppServerNode({ data }) {
     idle: 'bg-indigo-500',
   };
 
-  const utilizationBarColor = utilization > 0.85 ? 'bg-rose-500' : utilization > 0.6 ? 'bg-amber-500' : 'bg-emerald-500';
-  const handleClass = "!w-2.5 !h-2.5 !bg-indigo-500 !border-2 !border-[#0a0a0c]";
+  const utilizationBarColor = utilization > 0.85 ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]' : utilization > 0.6 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]' : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+  const handleClass = "!w-3 !h-3 !bg-indigo-500 !border-2 !border-[#050507] hover:!scale-125 transition-transform";
+
+  const auraColors = {
+    healthy: 'bg-emerald-500/20',
+    stressed: 'bg-amber-500/20',
+    overloaded: 'bg-rose-500/20',
+    idle: 'bg-indigo-500/10',
+  };
 
   return (
-    <div className={`node-card border-2 min-w-[170px] ${statusColors[status]} ${status === 'down' ? 'node-down' : ''} hover:scale-[1.02]`}>
+    <div className={`node-card group min-w-[180px] shadow-2xl ${status === 'down' ? 'node-down' : ''}`}>
+      <div className={`status-aura ${auraColors[status]}`} />
+      
       <Handle type="source" position={Position.Top} id="top" className={handleClass} />
       <Handle type="source" position={Position.Bottom} id="bottom" className={handleClass} />
       <Handle type="source" position={Position.Left} id="left" className={handleClass} />
       <Handle type="source" position={Position.Right} id="right" className={handleClass} />
 
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 rounded-lg bg-indigo-500/15 text-indigo-400">
-          <Server className="w-4 h-4" />
-        </div>
-        <div className="flex-1">
-          <p className="text-xs font-semibold text-white">{data.label || 'App Server'}</p>
-          <p className="text-[9px] text-slate-500 uppercase tracking-wider">App Server</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className={`w-2 h-2 rounded-full ${glowColors[status]} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative">
+          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:scale-110 transition-transform">
+            <Server className="w-4 h-4" />
+          </div>
           {status !== 'idle' && (
-            <span className={`text-[7px] font-bold px-1 py-0.5 rounded border ${
-              status === 'healthy' ? 'text-emerald-400 border-emerald-500/30' :
-              status === 'stressed' ? 'text-amber-400 border-amber-500/30' :
-              status === 'overloaded' ? 'text-rose-400 border-rose-500/30' :
-              'text-slate-500 border-slate-500/30'
+            <div className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-[#050507] ${glowColors[status]} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-black text-white truncate leading-none mb-1 uppercase tracking-tight">{data.label || 'App Server'}</p>
+          <div className="flex items-center gap-1.5 leading-none">
+            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Compute Node</span>
+            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-sm border ${
+              status === 'healthy' ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' :
+              status === 'stressed' ? 'text-amber-400 border-amber-500/20 bg-amber-500/5' :
+              status === 'overloaded' ? 'text-rose-400 border-rose-500/20 bg-rose-500/5' :
+              'text-slate-500 border-slate-500/20 bg-slate-500/5'
             }`}>
               {status.toUpperCase()}
             </span>
-          )}
+          </div>
         </div>
       </div>
 
-      {status !== 'idle' && (
-        <>
-          <div className="mb-3">
-            <div className="flex justify-between text-[10px] mb-1">
-              <span className="text-slate-500">CPU Utilization</span>
-              <span className="text-indigo-400 font-mono">{(utilization * 100).toFixed(0)}%</span>
+      {status !== 'idle' ? (
+        <div className="space-y-4">
+          <div className="bg-white/[0.03] rounded-xl p-3 border border-white/5">
+            <div className="flex justify-between items-end mb-2">
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">CPU Load</span>
+              <span className="text-xs text-white font-black">{(utilization * 100).toFixed(0)}%</span>
             </div>
-            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-              <div className={`h-full ${utilizationBarColor} rounded-full transition-all duration-500 ease-out`} style={{ width: `${Math.min(utilization * 100, 100)}%` }} />
+            <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden p-[1px]">
+              <div className={`h-full ${utilizationBarColor} rounded-full transition-all duration-1000 ease-out`} style={{ width: `${Math.min(utilization * 100, 100)}%` }} />
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 text-xs">
-            <div className="bg-white/5 rounded-lg p-1.5 text-center">
-              <p className="text-slate-500 text-[9px]">Latency</p>
-              <p className="text-indigo-400 font-mono font-bold text-[11px]">{latency.toFixed(0)}ms</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-white/[0.02] rounded-xl p-2.5 border border-white/5 text-center group/metric hover:bg-white/[0.05] transition-colors">
+              <p className="text-slate-500 text-[8px] font-bold uppercase tracking-tighter mb-1 group-hover/metric:text-indigo-400 transition-colors">Avg Latency</p>
+              <p className="text-white font-black text-sm tabular-nums tracking-tight">{latency.toFixed(0)}<span className="text-[10px] ml-0.5 opacity-40">ms</span></p>
             </div>
-            <div className="bg-white/5 rounded-lg p-1.5 text-center flex flex-col gap-0.5">
-              <p className="text-slate-500 text-[8px]">Arrival (R / W)</p>
-              <div className="flex justify-between items-center px-0.5">
-                <span className="text-cyan-400 font-mono font-bold text-[9px]">{data.metrics?.arrivalRead?.toFixed(0) || 0}</span>
-                <span className="text-white/20 text-[8px]">/</span>
-                <span className="text-rose-400 font-mono font-bold text-[9px]">{data.metrics?.arrivalWrite?.toFixed(0) || 0}</span>
-              </div>
+            <div className="bg-white/[0.02] rounded-xl p-2.5 border border-white/5 text-center group/metric hover:bg-white/[0.05] transition-colors">
+              <p className="text-slate-500 text-[8px] font-bold uppercase tracking-tighter mb-1 group-hover/metric:text-cyan-400 transition-colors">Throughput</p>
+              <p className="text-white font-black text-sm tabular-nums tracking-tight">{throughput.toFixed(0)}<span className="text-[10px] ml-0.5 opacity-40">rps</span></p>
             </div>
-            <div className="bg-white/5 rounded-lg p-1.5 text-center">
-              <p className="text-slate-500 text-[8px]">Queue</p>
-              <p className="text-indigo-400 font-mono font-bold text-[10px]">{queueDepth.toFixed(0)}</p>
+            <div className="bg-white/[0.02] rounded-xl p-2 border border-white/5 text-center col-span-2 flex items-center justify-between px-3">
+              <span className="text-slate-500 text-[8px] font-bold uppercase tracking-widest">Queue Backlog</span>
+              <span className={`font-black text-xs tabular-nums ${queueDepth > 100 ? 'text-rose-400' : 'text-slate-300'}`}>
+                {queueDepth.toFixed(0)}
+              </span>
             </div>
           </div>
-        </>
+        </div>
+      ) : (
+        <div className="py-4 text-center border-t border-white/5 mt-2">
+          <p className="text-[10px] text-slate-600 font-medium italic">Pending Deployment...</p>
+        </div>
       )}
     </div>
   );

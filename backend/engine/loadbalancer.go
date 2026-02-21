@@ -6,17 +6,13 @@ import "math"
 // DOWN nodes are excluded from routing, causing traffic redistribution.
 type LoadBalancer struct {
 	BaseNode
-	throughput            float64
-	readTP                float64
-	writeTP               float64
-	utilization           float64
-	CapacityRPS           float64
-	BackpressureEnabled   bool
-	BackpressureThreshold float64
-	Algorithm             string // "round-robin", "weighted", "least-connections"
-	rrIndex               int    // index for round-robin distribution
-	currentDropped        float64
-	totalDropped          float64
+	throughput  float64
+	readTP      float64
+	writeTP     float64
+	utilization float64
+	CapacityRPS float64
+	Algorithm   string // "round-robin", "weighted", "least-connections"
+	rrIndex     int    // index for round-robin distribution
 }
 
 // NewLoadBalancer creates a new LoadBalancer node.
@@ -27,9 +23,8 @@ func NewLoadBalancer(id, label string) *LoadBalancer {
 			NodeType:  "loadbalancer",
 			NodeLabel: label,
 		},
-		CapacityRPS:           500,
-		BackpressureThreshold: 0.9,
-		Algorithm:             "round-robin",
+		CapacityRPS: 500,
+		Algorithm:   "round-robin",
 	}
 }
 
@@ -53,7 +48,7 @@ func (lb *LoadBalancer) Process() {
 		inWrite = inTotal * 0.3
 	}
 
-	// Initial cap: Load Balancer self-capacity
+	// Process minimum of incoming requests and load balancer capacity
 	processed := math.Min(inTotal, lb.CapacityRPS)
 	// Force integer throughput for UI consistency
 	lb.throughput = math.Floor(processed + 0.5)
@@ -79,8 +74,6 @@ func (lb *LoadBalancer) Process() {
 	}
 
 	if len(alive) == 0 {
-		lb.currentDropped = inTotal
-		lb.totalDropped += inTotal
 		return
 	}
 
@@ -188,9 +181,6 @@ func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 		util = lb.throughput / lb.CapacityRPS
 	}
 	status := StatusFromUtilization(util, 0, lb.Down)
-	if lb.currentDropped > 0 {
-		status = "rejecting"
-	}
 	lat := lb.CurrentLatency()
 	return NodeMetrics{
 		ID:              lb.NodeID,
@@ -202,8 +192,8 @@ func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 		ReadThroughput:  lb.readTP,
 		WriteThroughput: lb.writeTP,
 		Throughput:      lb.throughput,
-		Dropped:         lb.totalDropped,
-		DropRate:        lb.currentDropped,
+		Dropped:         0,
+		DropRate:        0,
 		Status:          status,
 		ArrivalRead:     lb.lastArrivalR,
 		ArrivalWrite:    lb.lastArrivalW,
@@ -212,5 +202,4 @@ func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 }
 func (lb *LoadBalancer) ResetQueues() {
 	lb.throughput = 0
-	lb.currentDropped = 0
 }

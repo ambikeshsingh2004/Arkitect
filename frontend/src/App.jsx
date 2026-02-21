@@ -30,6 +30,14 @@ const nodeTypes = {
 let nodeId = 0;
 const getId = () => `node_${++nodeId}`;
 
+const typeCounters = {
+  client: 0,
+  loadbalancer: 0,
+  appserver: 0,
+  database: 0,
+  dbrouter: 0,
+};
+
 const defaultEdgeOptions = {
   animated: true,
   style: { stroke: '#6366f1', strokeWidth: 2 },
@@ -40,7 +48,7 @@ const defaultEdgeOptions = {
 // Default data per node type
 const defaultNodeData = {
   client: { rps: 100, readRatio: 0.7 },
-  loadbalancer: { algorithm: 'round-robin', maxRPS: 1000, backpressureEnabled: false },
+  loadbalancer: { algorithm: 'round-robin', maxRPS: 1000 },
   appserver: { maxRPS: 200, baseLatency: 20, concurrencyLimit: 0 },
   database: { maxRPS: 100, baseLatency: 50, concurrencyLimit: 0 },
   dbrouter: { readRatio: 0.7 },
@@ -188,8 +196,6 @@ function App() {
         maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : n.type === 'loadbalancer' ? 500 : 0),
         baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
         isReplica: n.data.isReplica || false,
-        backpressureEnabled: n.data.backpressureEnabled || false,
-        backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
         concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
@@ -218,6 +224,8 @@ function App() {
     setNodes([]);
     setEdges([]);
     setSelectedNodeId(null);
+    nodeId = 0;
+    Object.keys(typeCounters).forEach(k => typeCounters[k] = 0);
   };
 
   // Remove a single node and its connected edges
@@ -260,13 +268,14 @@ function App() {
       };
 
       if (type === 'database') {
+        typeCounters.database++;
         const primaryId = getId();
         const primaryNode = {
           id: primaryId,
           type: 'database',
           position,
           data: {
-            label: `Primary DB ${primaryId.split('_')[1]}`,
+            label: `Primary DB ${typeCounters.database}`,
             metrics: null,
             ...defaultNodeData.database,
             isReplica: false,
@@ -279,7 +288,7 @@ function App() {
           type: 'database',
           position: { x: position.x + 220, y: position.y },
           data: {
-            label: `Read Replica ${replicaId.split('_')[1]}`,
+            label: `Primary DB ${typeCounters.database} Replica`,
             metrics: null,
             ...defaultNodeData.database,
             isReplica: true,
@@ -292,12 +301,13 @@ function App() {
           return nextNodes;
         });
       } else {
+        typeCounters[type]++;
         const newNode = {
           id: getId(),
           type,
           position,
           data: {
-            label: `${labelMap[type]} ${nodeId}`,
+            label: `${labelMap[type]} ${typeCounters[type]}`,
             metrics: null,
             ...defaultNodeData[type],
           },
@@ -327,8 +337,6 @@ function App() {
         maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : n.type === 'loadbalancer' ? 500 : 0),
         baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
         isReplica: n.data.isReplica || false,
-        backpressureEnabled: n.data.backpressureEnabled || false,
-        backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
         concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
@@ -498,11 +506,15 @@ function App() {
     <div className="flex h-screen w-full bg-[#0a0a0c] text-slate-200 overflow-hidden font-sans">
       {/* ── Sidebar ── */}
       <div className="w-64 border-r border-white/5 bg-[#0e0e11] flex flex-col p-4 gap-6 shrink-0">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Layout className="text-white w-6 h-6" />
+        <div className="flex items-center gap-3 px-4 py-2 mb-2">
+          <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_8px_16px_-4px_rgba(99,102,241,0.4)] border border-white/10 group overflow-hidden relative">
+            <Layout className="text-white w-6 h-6 z-10" />
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Arkitect</h1>
+          <div>
+            <h1 className="text-xl font-black tracking-tight text-white leading-tight">Arkitect</h1>
+            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest opacity-80">v2.0 Preview</p>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4 mt-4">
@@ -511,32 +523,37 @@ function App() {
             <DraggableItem icon={<Users className="w-4 h-4" />} label="Client" type="client" color="emerald" />
             <DraggableItem icon={<Share2 className="w-4 h-4" />} label="Load Balancer" type="loadbalancer" color="blue" />
             <DraggableItem icon={<Server className="w-4 h-4" />} label="App Server" type="appserver" color="indigo" />
-            <DraggableItem icon={<Split className="w-4 h-4" />} label="DB Router" type="dbrouter" color="violet" />
             <DraggableItem icon={<Database className="w-4 h-4" />} label="Database" type="database" color="rose" />
           </div>
         </div>
 
         {/* Traffic Controls */}
-        <div className="mt-auto pt-6 border-t border-white/5">
-          <div className="flex items-center justify-between px-2 mb-3">
-            <span className="text-sm font-medium">Traffic RPS</span>
-            <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md">{trafficRPS}</span>
+        <div className="mt-auto space-y-4 pt-6 border-t border-white/5">
+          <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">System Traffic</span>
+              <span className="text-[10px] text-indigo-400 font-bold bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">{trafficRPS} RPS</span>
+            </div>
+            
+            <button
+              onClick={toggleSpike}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold text-xs transition-all duration-300 ${
+                spikeOn
+                  ? 'bg-amber-500 text-black shadow-[0_0_20px_-4px_rgba(245,158,11,0.5)]'
+                  : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 hover:border-white/20'
+              }`}
+            >
+              {spikeOn ? <Zap className="w-3.5 h-3.5 fill-current" /> : <ZapOff className="w-3.5 h-3.5" />}
+              {spikeOn ? 'SPIKE ACTIVE' : 'TOGGLE TRAFFIC SPIKE'}
+            </button>
           </div>
-          <p className="text-[10px] text-slate-600 px-2 mb-3">Set via Client node properties</p>
 
-          <button
-            onClick={toggleSpike}
-            className={`mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-              spikeOn
-                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                : 'bg-white/5 text-slate-400 border border-white/10 hover:bg-white/10'
-            }`}
-          >
-            {spikeOn ? <Zap className="w-4 h-4 fill-current" /> : <ZapOff className="w-4 h-4" />}
-            {spikeOn ? 'Spike Active (2x)' : 'Traffic Spike'}
-          </button>
-
-          <p className="text-[10px] text-slate-600 px-2 mt-4">Right-click a node during simulation to take it DOWN</p>
+          <div className="bg-slate-900/40 rounded-xl p-3 border border-white/5">
+            <div className="flex items-start gap-2">
+              <Activity className="w-3 h-3 text-slate-500 mt-0.5" />
+              <p className="text-[9px] text-slate-500 leading-relaxed font-medium">Right-click a node during simulation to toggle its health status manually.</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -548,16 +565,16 @@ function App() {
             <button
               onClick={isRunning ? stopSimulation : startSimulation}
               disabled={nodes.length === 0}
-              className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium text-sm transition-all ${
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-500 ${
                 isRunning
-                  ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25'
+                  ? 'bg-rose-500 text-white shadow-[0_0_25px_-5px_rgba(244,63,94,0.4)]'
                   : nodes.length === 0
-                  ? 'bg-white/5 text-slate-600 border border-white/5 cursor-not-allowed'
-                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                  ? 'bg-white/5 text-slate-700 cursor-not-allowed opacity-50'
+                  : 'bg-emerald-500 text-black shadow-[0_0_25px_-5px_rgba(16,185,129,0.4)] hover:scale-105 active:scale-95'
               }`}
             >
-              {isRunning ? <Square className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-              {isRunning ? 'Stop' : 'Simulate'}
+              {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+              {isRunning ? 'Terminate' : 'Deploy Simulation'}
             </button>
 
             <div className="h-6 w-px bg-white/10" />
@@ -611,10 +628,10 @@ function App() {
             connectionMode="loose"
             deleteKeyCode={['Backspace', 'Delete']}
             fitView
-            className="bg-[#0a0a0c]"
+            className="bg-[#050507]"
             proOptions={{ hideAttribution: true }}
           >
-            <Background color="#1e1e24" gap={24} size={1} />
+            <Background color="#1e1e24" gap={32} size={1} variant="dots" />
             <Controls className="!bg-[#141417] !border-white/10 !text-slate-400 !rounded-xl !shadow-2xl" />
             <MiniMap
               nodeColor={(n) => {
@@ -665,12 +682,12 @@ function DraggableItem({ icon, label, type, color }) {
 
   return (
     <div
-      className="flex items-center gap-3 p-3 rounded-xl border border-white/5 hover:border-white/20 hover:bg-white/5 cursor-grab active:cursor-grabbing transition-all group"
+      className="flex items-center gap-3 p-4 rounded-2xl border border-white/5 bg-[#141417]/50 hover:border-white/20 hover:bg-white/5 cursor-grab active:cursor-grabbing transition-all scale-animation"
       onDragStart={onDragStart}
       draggable
     >
-      <div className={`p-2 rounded-lg ${colorMap[color]} group-hover:scale-110 transition-transform`}>{icon}</div>
-      <span className="text-sm font-medium text-slate-300">{label}</span>
+      <div className={`p-2.5 rounded-xl shadow-lg border border-white/10 ${colorMap[color]} group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
+      <span className="text-sm font-bold text-slate-300 tracking-tight">{label}</span>
     </div>
   );
 }

@@ -9,18 +9,16 @@ import (
 
 // NodeConfig represents a node definition from the frontend.
 type NodeConfig struct {
-	ID                    string  `json:"id"`
-	Type                  string  `json:"type"`
-	Label                 string  `json:"label"`
-	RPS                   float64 `json:"rps,omitempty"`
-	MaxRPS                float64 `json:"maxRPS,omitempty"`
-	BaseLatency           float64 `json:"baseLatency,omitempty"`
-	IsReplica             bool    `json:"isReplica,omitempty"`
-	BackpressureEnabled   bool    `json:"backpressureEnabled,omitempty"`
-	BackpressureThreshold float64 `json:"backpressureThreshold,omitempty"`
-	Algorithm             string  `json:"algorithm,omitempty"`
-	ReadRatio             float64 `json:"readRatio,omitempty"`
-	ConcurrencyLimit      float64 `json:"concurrencyLimit,omitempty"`
+	ID               string  `json:"id"`
+	Type             string  `json:"type"`
+	Label            string  `json:"label"`
+	RPS              float64 `json:"rps,omitempty"`
+	MaxRPS           float64 `json:"maxRPS,omitempty"`
+	BaseLatency      float64 `json:"baseLatency,omitempty"`
+	IsReplica        bool    `json:"isReplica,omitempty"`
+	Algorithm        string  `json:"algorithm,omitempty"`
+	ReadRatio        float64 `json:"readRatio,omitempty"`
+	ConcurrencyLimit float64 `json:"concurrencyLimit,omitempty"`
 }
 
 // EdgeConfig represents an edge (connection) from the frontend.
@@ -80,10 +78,6 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 			}
 			lb := NewLoadBalancer(nc.ID, nc.Label)
 			lb.CapacityRPS = maxRPS
-			lb.BackpressureEnabled = nc.BackpressureEnabled
-			if nc.BackpressureThreshold > 0 {
-				lb.BackpressureThreshold = nc.BackpressureThreshold
-			}
 			if nc.Algorithm != "" {
 				lb.Algorithm = nc.Algorithm
 			}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Server, Database, Share2, Users, Power, PowerOff, Copy, Trash2, Split, RefreshCcw } from 'lucide-react';
+import { X, Server, Database, Share2, Users, Power, PowerOff, Copy, Trash2, Split, RefreshCcw, Activity } from 'lucide-react';
 
 const typeLabels = {
   client: 'Client',
@@ -57,10 +57,6 @@ export default function PropertiesPanel({
           body.maxRPS = value;
         } else if (field === 'baseLatency') {
           body.baseLatency = value;
-        } else if (field === 'backpressureEnabled') {
-          body.backpressureEnabled = value;
-        } else if (field === 'backpressureThreshold') {
-          body.backpressureThreshold = value;
         } else if (field === 'algorithm') {
           body.algorithm = value;
         } else if (field === 'readRatio') {
@@ -82,314 +78,304 @@ export default function PropertiesPanel({
     }
   };
 
+  const accentColorMap = {
+    emerald: 'text-emerald-400 accent-emerald-500 bg-emerald-500/10 border-emerald-500/20',
+    blue: 'text-blue-400 accent-blue-500 bg-blue-500/10 border-blue-500/20',
+    indigo: 'text-indigo-400 accent-indigo-500 bg-indigo-500/10 border-indigo-500/20',
+    rose: 'text-rose-400 accent-rose-500 bg-rose-500/10 border-rose-500/20',
+    violet: 'text-violet-400 accent-violet-500 bg-violet-500/10 border-violet-500/20',
+  };
+
+  const accentClasses = accentColorMap[color];
+
   return (
-    <div className="w-72 border-l border-white/5 bg-[#0e0e11] flex flex-col shrink-0 animate-slide-in">
+    <div className="w-80 border-l border-white/5 bg-[#0e0e11]/95 backdrop-blur-xl flex flex-col shrink-0 animate-slide-in shadow-[-20px_0_50px_rgba(0,0,0,0.5)] z-20">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <div className={`p-1.5 rounded-lg bg-${color}-500/15 text-${color}-400`}>
+      <div className="flex items-center justify-between p-6 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
+        <div className="flex items-center gap-4">
+          <div className={`p-2.5 rounded-xl border ${accentClasses} shadow-lg group hover:scale-110 transition-transform duration-500`}>
             {typeIcons[node.type]}
           </div>
           <div>
-            <p className="text-sm font-semibold text-white">{node.data.label}</p>
-            <p className="text-[10px] text-slate-500 uppercase">{typeLabels[node.type]}</p>
+            <p className="text-sm font-black text-white uppercase tracking-tight leading-none mb-1">{node.data.label}</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{typeLabels[node.type]}</span>
+              {isRunning && (
+                <span className={`w-1.5 h-1.5 rounded-full ${isDown ? 'bg-rose-500' : 'bg-emerald-500'} animate-pulse`} />
+              )}
+            </div>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded-lg hover:bg-white/10 text-slate-500 hover:text-white transition-colors"
+          className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-500 hover:text-white transition-all active:scale-90"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Properties */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+      <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-8 custom-scrollbar">
         {/* Label */}
-        <FieldGroup label="Label">
+        <FieldGroup label="Identification">
           <input
             type="text"
             value={node.data.label || ''}
             onChange={(e) => handleChange('label', e.target.value)}
             disabled={isRunning}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 disabled:opacity-50"
+            placeholder="Node Name"
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500/40 disabled:opacity-30 transition-all placeholder:text-slate-700"
           />
         </FieldGroup>
 
-        {/* Client-specific: RPS & ReadRatio */}
-        {node.type === 'client' && (
-          <>
-            <FieldGroup label="Total Traffic (RPS)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="10"
-                  max="2000"
-                  value={node.data.rps || 100}
-                  onChange={(e) => handleChange('rps', Number(e.target.value))}
-                  className="flex-1 accent-emerald-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.rps || 100}
-                </span>
-              </div>
-            </FieldGroup>
-            <FieldGroup label="Read/Write Ratio">
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-semibold uppercase">
-                  <span className="text-cyan-400">Reads: {((node.data.readRatio || 0.7) * 100).toFixed(0)}%</span>
-                  <span className="text-rose-400">Writes: {((1 - (node.data.readRatio || 0.7)) * 100).toFixed(0)}%</span>
+        <div className="space-y-6">
+          <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-4">Configuration</p>
+          
+          {/* Client-specific: RPS & ReadRatio */}
+          {node.type === 'client' && (
+            <>
+              <FieldGroup label="Traffic Intensity">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Demand Pulse</span>
+                    <span className="text-xs text-emerald-400 font-black tabular-nums">{node.data.rps || 100} RPS</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="2000"
+                    value={node.data.rps || 100}
+                    onChange={(e) => handleChange('rps', Number(e.target.value))}
+                    className="w-full h-1.5 accent-emerald-500"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={node.data.readRatio || 0.7}
-                  onChange={(e) => handleChange('readRatio', Number(e.target.value))}
-                  className="w-full accent-cyan-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
-            </FieldGroup>
-          </>
-        )}
-
-        {/* Server-specific: Max RPS & Base Latency */}
-        {node.type === 'appserver' && (
-          <>
-            <FieldGroup label="Max Capacity (RPS)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="10"
-                  max="2000"
-                  value={node.data.maxRPS || 100}
-                  onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
-                  className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.maxRPS || 100}
-                </span>
-              </div>
-            </FieldGroup>
-            <FieldGroup label="Base Latency (ms)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="1"
-                  max="200"
-                  value={node.data.baseLatency || 20}
-                  onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
-                  className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.baseLatency || 20}ms
-                </span>
-              </div>
-            </FieldGroup>
-          </>
-        )}
-
-        {/* Database-specific: Max RPS & Base Latency */}
-        {node.type === 'database' && (
-          <>
-            <FieldGroup label="Max Capacity (QPS)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="10"
-                  max="1000"
-                  value={node.data.maxRPS || 50}
-                  onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
-                  className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.maxRPS || 50}
-                </span>
-              </div>
-            </FieldGroup>
-            <FieldGroup label="Base Latency (ms)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="5"
-                  max="500"
-                  value={node.data.baseLatency || 50}
-                  onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
-                  className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.baseLatency || 50}ms
-                </span>
-              </div>
-            </FieldGroup>
-          </>
-        )}
-
-        {node.type === 'loadbalancer' && (
-          <>
-            <FieldGroup label="Max Capacity (RPS)">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min="50"
-                  max="5000"
-                  value={node.data.maxRPS || 500}
-                  onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
-                  className="flex-1 accent-blue-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
-                  {node.data.maxRPS || 500}
-                </span>
-              </div>
-            </FieldGroup>
-            <FieldGroup label="Algorithm">
-              <select
-                value={node.data.algorithm || 'round-robin'}
-                onChange={(e) => handleChange('algorithm', e.target.value)}
-                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
-                style={{ backgroundColor: '#111827' }} // Force dark background for options in some browsers
-              >
-                <option value="round-robin" className="bg-slate-900">Round Robin</option>
-                <option value="weighted" className="bg-slate-900">Divide by Capacity</option>
-              </select>
-            </FieldGroup>
-            <FieldGroup label="Backpressure Control">
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleChange('backpressureEnabled', !node.data.backpressureEnabled)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
-                    node.data.backpressureEnabled
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                      : 'bg-white/5 border-white/10 text-slate-400'
-                  }`}
-                >
-                  <span className="text-xs font-medium">Reject Load {'>'} {(node.data.backpressureThreshold * 100 || 90).toFixed(0)}%</span>
-                  <div className={`w-8 h-4 rounded-full relative transition-colors ${node.data.backpressureEnabled ? 'bg-amber-500' : 'bg-slate-700'}`}>
-                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${node.data.backpressureEnabled ? 'left-4.5' : 'left-0.5'}`} />
+              </FieldGroup>
+              <FieldGroup label="Workload Balance">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-widest leading-none">
+                    <span className="text-cyan-400">R: {((node.data.readRatio || 0.7) * 100).toFixed(0)}%</span>
+                    <span className="text-rose-400">W: {((1 - (node.data.readRatio || 0.7)) * 100).toFixed(0)}%</span>
                   </div>
-                </button>
-                
-                {node.data.backpressureEnabled && (
-                  <div className="px-1">
-                    <p className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-tight">Threshold Limit</p>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="0.95"
-                        step="0.05"
-                        value={node.data.backpressureThreshold || 0.9}
-                        onChange={(e) => handleChange('backpressureThreshold', Number(e.target.value))}
-                        className="flex-1 accent-amber-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded text-center min-w-[32px]">
-                        {(node.data.backpressureThreshold * 100 || 90).toFixed(0)}%
-                      </span>
-                    </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={node.data.readRatio || 0.7}
+                    onChange={(e) => handleChange('readRatio', Number(e.target.value))}
+                    className="w-full h-1.5 accent-cyan-500"
+                  />
+                </div>
+              </FieldGroup>
+            </>
+          )}
+
+          {/* Server-specific: Max RPS & Base Latency */}
+          {node.type === 'appserver' && (
+            <>
+              <FieldGroup label="Processing Capacity">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Max TPS</span>
+                    <span className="text-xs text-indigo-400 font-black tabular-nums">{node.data.maxRPS || 100}</span>
                   </div>
-                )}
-              </div>
-            </FieldGroup>
-          </>
-        )}
+                  <input
+                    type="range"
+                    min="10"
+                    max="2000"
+                    value={node.data.maxRPS || 100}
+                    onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
+                    className="w-full h-1.5 accent-indigo-500"
+                  />
+                </div>
+              </FieldGroup>
+              <FieldGroup label="Compute Latency">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Baseline</span>
+                    <span className="text-xs text-indigo-400 font-black tabular-nums">{node.data.baseLatency || 20}ms</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="200"
+                    value={node.data.baseLatency || 20}
+                    onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
+                    className="w-full h-1.5 accent-indigo-500"
+                  />
+                </div>
+              </FieldGroup>
+            </>
+          )}
+
+          {/* Database-specific: Max RPS & Base Latency */}
+          {node.type === 'database' && (
+            <>
+              <FieldGroup label="IO Throughput">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Max QPS</span>
+                    <span className="text-xs text-rose-400 font-black tabular-nums">{node.data.maxRPS || 50}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="1000"
+                    value={node.data.maxRPS || 50}
+                    onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
+                    className="w-full h-1.5 accent-rose-500"
+                  />
+                </div>
+              </FieldGroup>
+              <FieldGroup label="Storage Latency">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Baseline</span>
+                    <span className="text-xs text-rose-400 font-black tabular-nums">{node.data.baseLatency || 50}ms</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="500"
+                    value={node.data.baseLatency || 50}
+                    onChange={(e) => handleChange('baseLatency', Number(e.target.value))}
+                    className="w-full h-1.5 accent-rose-500"
+                  />
+                </div>
+              </FieldGroup>
+            </>
+          )}
+
+          {node.type === 'loadbalancer' && (
+            <>
+              <FieldGroup label="Routing Capacity">
+                <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">Max Pulse</span>
+                    <span className="text-xs text-blue-400 font-black tabular-nums">{node.data.maxRPS || 500}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="5000"
+                    value={node.data.maxRPS || 500}
+                    onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
+                    className="w-full h-1.5 accent-blue-500"
+                  />
+                </div>
+              </FieldGroup>
+              <FieldGroup label="Distribution Algorithm">
+                <div className="relative group">
+                  <select
+                    value={node.data.algorithm || 'round-robin'}
+                    onChange={(e) => handleChange('algorithm', e.target.value)}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:outline-none focus:border-blue-500/40 appearance-none cursor-pointer tracking-tight"
+                  >
+                    <option value="round-robin">Round Robin</option>
+                    <option value="weighted">Capacity Weighted</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500 group-hover:text-blue-400 transition-colors">
+                    <Share2 className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+              </FieldGroup>
+            </>
+          )}
+        </div>
 
         {/* Live Metrics (during simulation) */}
         {isRunning && node.data.metrics && (
-          <div className="mt-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Live Metrics</p>
-            <div className={`grid ${node.type === 'client' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
-              {node.type !== 'client' && <MetricCard label="Utilization" value={`${(node.data.metrics.utilization * 100).toFixed(0)}%`} />}
-              {node.type !== 'client' && <MetricCard label="Latency" value={`${node.data.metrics.latency?.toFixed(0)}ms`} />}
+          <div className="space-y-4 animate-slide-in">
+            <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em]">Runtime Telemetry</p>
+            <div className={`grid ${node.type === 'client' ? 'grid-cols-1' : 'grid-cols-2'} gap-2.5`}>
+              {node.type !== 'client' && <MetricCard label="Efficiency" value={`${(node.data.metrics.utilization * 100).toFixed(0)}%`} color={color} />}
+              {node.type !== 'client' && <MetricCard label="MS Latency" value={`${node.data.metrics.latency?.toFixed(0)}`} color={color} />}
               
-              {/* Effective Capacity Breakdown - only show if backend reports a limit > 0 */}
+              {/* Throttling Diagnostic */}
               {node.type !== 'client' && node.data.metrics.effectiveCapacity > 0 && 
                node.data.metrics.effectiveCapacity < (node.data.maxRPS || 100) && (
-                <div className="col-span-2 bg-rose-500/10 border border-rose-500/20 rounded-lg p-2 flex flex-col gap-1">
-                  <p className="text-rose-400 text-[9px] text-center font-bold uppercase tracking-tight">Active Capacity Limit</p>
-                  <div className="flex justify-between items-center px-4">
-                    <span className="text-slate-500 text-[10px]">Throttled to:</span>
-                    <span className="text-rose-400 font-mono font-bold text-xs">{node.data.metrics.effectiveCapacity?.toFixed(1)} <span className="text-[9px] opacity-70">rps</span></span>
+                <div className="col-span-2 bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 w-1 h-full bg-rose-500" />
+                  <div className="flex justify-between items-center">
+                    <p className="text-rose-500 text-[10px] font-black uppercase tracking-widest">Cap Throttled</p>
+                    <span className="text-rose-400 font-black text-sm">{node.data.metrics.effectiveCapacity?.toFixed(1)} <span className="text-[9px] opacity-70">rps</span></span>
                   </div>
-                  <p className="text-[8px] text-slate-500 text-center italic">Value dropped due to Concurrency Limit and High Latency</p>
+                  <p className="text-[9px] text-slate-500 leading-tight font-medium">Restricted by downstream latency and concurrency exhaustion.</p>
                 </div>
               )}
 
               {/* Read/Write Breakdown */}
-              <div className="col-span-2 bg-white/5 rounded-lg p-2 flex flex-col gap-1">
-                <p className="text-slate-500 text-[9px] text-center">Throughput (Read / Write)</p>
-                <div className="flex justify-between items-center px-4">
-                  <span className="text-cyan-400 font-mono font-bold text-xs">{node.data.metrics.readThroughput?.toFixed(0) || 0}</span>
-                  <div className="w-px h-3 bg-white/10" />
-                  <span className="text-rose-400 font-mono font-bold text-xs">{node.data.metrics.writeThroughput?.toFixed(0) || 0}</span>
-                </div>
+              <div className="col-span-2 bg-white/[0.03] p-4 rounded-2xl border border-white/5 space-y-2 group hover:bg-white/[0.05] transition-colors">
+                 <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest opacity-60">
+                    <span>Flow Breakdown</span>
+                    <Activity className="w-3 h-3 group-hover:animate-pulse" />
+                 </div>
+                 <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                       <p className="text-[8px] text-cyan-400 font-black uppercase">Read Pulse</p>
+                       <p className="text-lg font-black text-white tabular-nums">{node.data.metrics.readThroughput?.toFixed(0) || 0}</p>
+                    </div>
+                    <div className="w-px h-8 bg-white/10" />
+                    <div className="flex-1">
+                       <p className="text-[8px] text-rose-400 font-black uppercase">Write Pulse</p>
+                       <p className="text-lg font-black text-white tabular-nums">{node.data.metrics.writeThroughput?.toFixed(0) || 0}</p>
+                    </div>
+                 </div>
               </div>
 
-              {node.type !== 'client' && <MetricCard label="Queue Depth" value={node.data.metrics.queueDepth?.toFixed(0)} />}
-              
-              {node.data.metrics.dropped > 0 && (
-                <MetricCard label="Total Dropped" value={node.data.metrics.dropped?.toFixed(0)} warn />
-              )}
+              {node.type !== 'client' && <MetricCard label="In-Flight" value={node.data.metrics.queueDepth?.toFixed(0)} color={color} />}
+              {node.data.metrics.dropped > 0 && <MetricCard label="Load Rejected" value={node.data.metrics.dropped?.toFixed(0)} warn color="rose" />}
             </div>
           </div>
-        )}
-
-        {isRunning && (
-          <p className="text-[10px] text-emerald-500/60 italic">⚡ Changes apply instantly to live simulation</p>
         )}
       </div>
 
       {/* Actions */}
-      <div className="p-4 border-t border-white/5 flex flex-col gap-2">
+      <div className="p-6 border-t border-white/5 flex flex-col gap-3 bg-gradient-to-t from-white/[0.02] to-transparent">
         {node.type === 'database' && (
           <button
             onClick={() => onAddReplica(node.id)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25"
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-violet-600 text-white shadow-lg hover:shadow-violet-600/40 hover:-translate-y-1 active:translate-y-0"
           >
             <Copy className="w-4 h-4" />
-            Add Replica
+            Provision Replica
           </button>
         )}
 
-        {/* Toggle UP/DOWN — during simulation */}
+        {/* Toggle UP/DOWN */}
         {isRunning && node.type !== 'client' && (
-          <div className="space-y-2 text-center">
-            <button
-              onClick={() => onToggleDown(node.id, !isDown)}
-              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                isDown
-                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
-                  : 'bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25'
-              }`}
-            >
-              {isDown ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
-              {isDown ? 'Bring UP' : 'Take DOWN'}
-            </button>
-            <p className="text-[10px] text-slate-500 italic">
-              {isDown ? 'Restore node to service' : 'Simulate a node failure'}
-            </p>
-          </div>
+          <button
+            onClick={() => onToggleDown(node.id, !isDown)}
+            className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all duration-300 ${
+              isDown
+                ? 'bg-emerald-500 text-black shadow-lg hover:shadow-emerald-500/40'
+                : 'bg-rose-500 text-white shadow-lg hover:shadow-rose-500/40'
+            }`}
+          >
+            {isDown ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+            {isDown ? 'RECOVER SYSTEM' : 'SIMULATE CRASH'}
+          </button>
         )}
 
-        {/* Clear Queues — during simulation */}
+        {/* Reset */}
         {isRunning && (node.type === 'appserver' || node.type === 'database') && (
           <button
             onClick={onResetQueues}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25"
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30"
           >
             <RefreshCcw className="w-4 h-4" />
-            Clear All Queues
+            Flush Pipeline
           </button>
         )}
 
-        {/* Remove node — only when not running */}
+        {/* Remove node */}
         {!isRunning && (
           <button
             onClick={() => onRemoveNode(node.id)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:border-rose-500/30"
+            className="w-full flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all bg-white/5 text-slate-500 border border-white/5 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/20"
           >
             <Trash2 className="w-4 h-4" />
-            Remove
+            Delete Entity
           </button>
         )}
       </div>
@@ -399,8 +385,8 @@ export default function PropertiesPanel({
 
 function FieldGroup({ label, children }) {
   return (
-    <div>
-      <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1.5">
+    <div className="space-y-3">
+      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">
         {label}
       </label>
       {children}
@@ -408,11 +394,19 @@ function FieldGroup({ label, children }) {
   );
 }
 
-function MetricCard({ label, value, warn }) {
+function MetricCard({ label, value, warn, color }) {
+  const accentColors = {
+    emerald: 'text-emerald-400 group-hover:text-emerald-300',
+    blue: 'text-blue-400 group-hover:text-blue-300',
+    indigo: 'text-indigo-400 group-hover:text-indigo-300',
+    rose: 'text-rose-400 group-hover:text-rose-300',
+    violet: 'text-violet-400 group-hover:text-violet-300',
+  };
+
   return (
-    <div className="bg-white/5 rounded-lg p-2 text-center">
-      <p className="text-slate-500 text-[9px]">{label}</p>
-      <p className={`font-mono font-bold text-xs ${warn ? 'text-rose-400' : 'text-slate-300'}`}>{value}</p>
+    <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 text-center transition-all hover:bg-white/[0.05] group">
+      <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest mb-1 opacity-80 group-hover:opacity-100 transition-opacity">{label}</p>
+      <p className={`font-black text-lg tabular-nums tracking-tighter transition-colors ${warn ? 'text-rose-500' : accentColors[color] || 'text-white'}`}>{value}</p>
     </div>
   );
 }

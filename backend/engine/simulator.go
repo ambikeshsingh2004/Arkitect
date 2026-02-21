@@ -74,8 +74,8 @@ func (s *Simulator) SetNodeDown(nodeID string, down bool) bool {
 }
 
 // UpdateNodeConfig updates a node's configuration live during simulation.
-// Supports maxRPS, baseLatency, and backpressure for relevant nodes.
-func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, threshold, readRatio, concurrency, rps float64, backpressure, isReplica bool, algorithm string) bool {
+// Supports maxRPS, baseLatency, and other node-specific settings.
+func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, readRatio, concurrency, rps float64, isReplica bool, algorithm string) bool {
 	node, ok := s.graph.Nodes[nodeID]
 	if !ok {
 		return false
@@ -113,10 +113,6 @@ func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency, thresho
 	case *LoadBalancer:
 		if maxRPS > 0 {
 			n.CapacityRPS = maxRPS
-		}
-		n.BackpressureEnabled = backpressure
-		if threshold > 0 {
-			n.BackpressureThreshold = threshold
 		}
 		if algorithm != "" {
 			n.Algorithm = algorithm

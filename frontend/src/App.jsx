@@ -41,9 +41,9 @@ const defaultEdgeOptions = {
 const defaultNodeData = {
   client: { rps: 100 },
   loadbalancer: { algorithm: 'round-robin', backpressureEnabled: false },
-  appserver: { maxRPS: 100, baseLatency: 20 },
-  database: { maxRPS: 50, baseLatency: 50 },
-  dbrouter: {},
+  appserver: { maxRPS: 100, baseLatency: 20, concurrencyLimit: 10 },
+  database: { maxRPS: 50, baseLatency: 50, concurrencyLimit: 5 },
+  dbrouter: { readRatio: 0.7 },
 };
 
 function App() {
@@ -182,6 +182,7 @@ function App() {
         backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
+        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 10 : n.type === 'database' ? 5 : 0),
       })),
       edges: currentEdges.map((e) => ({
         source: e.source,
@@ -285,6 +286,7 @@ function App() {
         backpressureThreshold: n.data.backpressureThreshold || 0.9,
         algorithm: n.data.algorithm || 'round-robin',
         readRatio: n.data.readRatio || 0.7,
+        concurrencyLimit: n.data.concurrencyLimit || (n.type === 'appserver' ? 10 : n.type === 'database' ? 5 : 0),
       })),
       edges: edges.map((e) => ({
         source: e.source,

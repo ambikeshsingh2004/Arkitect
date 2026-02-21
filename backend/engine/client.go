@@ -25,14 +25,19 @@ func (c *Client) Process() {
 
 	c.throughput = incoming
 	downstream := c.Downstream()
-	n := float64(len(downstream))
-	if n == 0.0 || incoming == 0.0 {
-		return
+	// Forward to healthy nodes only
+	var healthy []Node
+	for _, node := range downstream {
+		if !node.IsDown() {
+			healthy = append(healthy, node)
+		}
 	}
 
-	perNode := incoming / n
-	for _, node := range downstream {
-		node.AddIncoming(perNode)
+	if len(healthy) > 0 && incoming > 0.0 {
+		perNode := incoming / float64(len(healthy))
+		for _, node := range healthy {
+			node.AddIncoming(perNode)
+		}
 	}
 }
 
@@ -49,4 +54,15 @@ func (c *Client) GetMetrics() NodeMetrics {
 
 func (c *Client) MaxRPS() float64 {
 	return 0
+}
+func (c *Client) CurrentLatency() float64 {
+	downstream := c.Downstream()
+	if len(downstream) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, node := range downstream {
+		sum += node.CurrentLatency()
+	}
+	return sum / float64(len(downstream))
 }

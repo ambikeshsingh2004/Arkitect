@@ -21,7 +21,12 @@ function ClientNode({ data }) {
           <p className="text-xs font-semibold text-white">{data.label || 'Client'}</p>
           <p className="text-[9px] text-slate-500 uppercase tracking-wider">Traffic Source</p>
         </div>
-        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="flex flex-col items-end gap-1">
+          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-[7px] font-bold px-1 py-0.5 rounded border text-emerald-400 border-emerald-500/30">
+            ACTIVE
+          </span>
+        </div>
       </div>
 
       <div className="bg-white/5 rounded-lg p-2 text-center">

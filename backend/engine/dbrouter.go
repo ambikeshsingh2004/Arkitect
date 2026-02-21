@@ -109,3 +109,49 @@ func (r *DBRouter) GetMetrics() NodeMetrics {
 func (r *DBRouter) MaxRPS() float64 {
 	return 0
 }
+func (r *DBRouter) CurrentLatency() float64 {
+	downstream := r.Downstream()
+	if len(downstream) == 0 {
+		return 0
+	}
+
+	var primaries []Node
+	var replicas []Node
+	for _, n := range downstream {
+		if !n.IsDown() {
+			if db, ok := n.(*Database); ok {
+				if db.IsReplica {
+					replicas = append(replicas, n)
+				} else {
+					primaries = append(primaries, n)
+				}
+			} else {
+				primaries = append(primaries, n)
+			}
+		}
+	}
+
+	avgPrimary := 0.0
+	if len(primaries) > 0 {
+		sum := 0.0
+		for _, p := range primaries {
+			sum += p.CurrentLatency()
+		}
+		avgPrimary = sum / float64(len(primaries))
+	}
+
+	avgReplica := 0.0
+	if len(replicas) > 0 {
+		sum := 0.0
+		for _, rep := range replicas {
+			sum += rep.CurrentLatency()
+		}
+		avgReplica = sum / float64(len(replicas))
+	} else {
+		avgReplica = avgPrimary // fallback
+	}
+
+	// Weighted average based on ReadRatio
+	latency := (r.ReadRatio * avgReplica) + ((1.0 - r.ReadRatio) * avgPrimary)
+	return latency + 1.0 // + 1ms overhead
+}

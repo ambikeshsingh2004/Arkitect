@@ -55,6 +55,10 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
           body.algorithm = value;
         } else if (field === 'readRatio') {
           body.readRatio = value;
+        } else if (field === 'concurrencyLimit') {
+          body.concurrencyLimit = value;
+        } else if (field === 'isReplica') {
+          body.isReplica = value;
         }
 
         await fetch(`/api/simulate/${sessionId}/config`, {
@@ -154,6 +158,21 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 </span>
               </div>
             </FieldGroup>
+            <FieldGroup label="Concurrency Limit">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={node.data.concurrencyLimit || 10}
+                  onChange={(e) => handleChange('concurrencyLimit', Number(e.target.value))}
+                  className="flex-1 accent-indigo-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-xs text-indigo-400 font-mono bg-indigo-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
+                  {node.data.concurrencyLimit || 10}
+                </span>
+              </div>
+            </FieldGroup>
           </>
         )}
 
@@ -187,6 +206,21 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
                 />
                 <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
                   {node.data.baseLatency || 50}ms
+                </span>
+              </div>
+            </FieldGroup>
+            <FieldGroup label="Concurrency Limit">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="1"
+                  max="50"
+                  value={node.data.concurrencyLimit || 5}
+                  onChange={(e) => handleChange('concurrencyLimit', Number(e.target.value))}
+                  className="flex-1 accent-rose-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-xs text-rose-400 font-mono bg-rose-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
+                  {node.data.concurrencyLimit || 5}
                 </span>
               </div>
             </FieldGroup>
@@ -297,17 +331,22 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
 
         {/* Toggle UP/DOWN — during simulation */}
         {isRunning && node.type !== 'client' && (
-          <button
-            onClick={() => onToggleDown(node.id, !isDown)}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-              isDown
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
-                : 'bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25'
-            }`}
-          >
-            {isDown ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
-            {isDown ? 'Bring UP' : 'Take DOWN'}
-          </button>
+          <div className="space-y-2 text-center">
+            <button
+              onClick={() => onToggleDown(node.id, !isDown)}
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                isDown
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25'
+                  : 'bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25'
+              }`}
+            >
+              {isDown ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
+              {isDown ? 'Bring UP' : 'Take DOWN'}
+            </button>
+            <p className="text-[10px] text-slate-500 italic">
+              {isDown ? 'Restore node to service' : 'Simulate a node failure'}
+            </p>
+          </div>
         )}
 
         {/* Remove node — only when not running */}

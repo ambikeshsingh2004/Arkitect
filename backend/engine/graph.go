@@ -19,6 +19,7 @@ type NodeConfig struct {
 	BackpressureThreshold float64 `json:"backpressureThreshold,omitempty"`
 	Algorithm             string  `json:"algorithm,omitempty"`
 	ReadRatio             float64 `json:"readRatio,omitempty"`
+	ConcurrencyLimit      float64 `json:"concurrencyLimit,omitempty"`
 }
 
 // EdgeConfig represents an edge (connection) from the frontend.
@@ -90,7 +91,11 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 			if baseLatency == 0 {
 				baseLatency = 20 // default 20ms
 			}
-			node = NewAppServer(nc.ID, nc.Label, maxRPS, baseLatency)
+			server := NewAppServer(nc.ID, nc.Label, maxRPS, baseLatency)
+			if nc.ConcurrencyLimit > 0 {
+				server.ConcurrencyLimit = nc.ConcurrencyLimit
+			}
+			node = server
 		case "database":
 			maxRPS := nc.MaxRPS
 			if maxRPS == 0 {
@@ -102,6 +107,9 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 			}
 			db := NewDatabase(nc.ID, nc.Label, maxRPS, baseLatency)
 			db.IsReplica = nc.IsReplica
+			if nc.ConcurrencyLimit > 0 {
+				db.ConcurrencyLimit = nc.ConcurrencyLimit
+			}
 			node = db
 		case "dbrouter":
 			r := NewDBRouter(nc.ID, nc.Label)

@@ -9,13 +9,13 @@ type Database struct {
 	CapacityRPS float64
 	BaseLatency float64 // ms
 
-	queueDepth   float64
-	throughput   float64
-	dropped      float64 // drops THIS tick
-	totalDropped float64 // accumulated drops since start
-	latency      float64
-	utilization  float64
-	IsReplica    bool
+	queueDepth       float64
+	throughput       float64
+	dropped          float64 // drops THIS tick
+	totalDropped     float64 // accumulated drops since start
+	utilization      float64
+	IsReplica        bool
+	ConcurrencyLimit float64
 }
 
 // NewDatabase creates a new Database node.
@@ -36,54 +36,66 @@ func NewDatabase(id, label string, maxRPS, baseLatency float64) *Database {
 func (d *Database) Process() {
 	if d.Down {
 		d.throughput = 0
-		d.latency = 0
 		d.utilization = 0
 		d.dropped = 0
-		d.Incoming = 0 // consume incoming
+		d.Incoming = 0
 		return
 	}
 
+	queueDelay := 0.0
+	if d.CapacityRPS > 0 {
+		queueDelay = (d.queueDepth / d.CapacityRPS) * 1000.0
+	}
+	totalLatency := d.BaseLatency + queueDelay
+
+	effectiveCapacity := d.CapacityRPS
+	if d.ConcurrencyLimit > 0 && totalLatency > 0 {
+		eff := (d.ConcurrencyLimit / totalLatency) * 1000.0
+		if eff < effectiveCapacity {
+			effectiveCapacity = eff
+		}
+	}
+
 	incoming := d.Incoming
-	d.Incoming = 0 // reset incoming immediately after capturing
+	d.Incoming = 0
 
 	totalArrival := incoming + d.queueDepth
-
-	processed := math.Min(totalArrival, d.CapacityRPS)
+	processed := math.Min(totalArrival, effectiveCapacity)
 	d.throughput = processed
 
 	d.queueDepth = math.Max(0.0, totalArrival-processed)
 
-	// Drop if queue exceeds 5x capacity
 	maxQueue := d.CapacityRPS * 5.0
 	if d.queueDepth > maxQueue {
 		d.dropped = d.queueDepth - maxQueue
-		d.totalDropped += d.dropped // accumulate
+		d.totalDropped += d.dropped
 		d.queueDepth = maxQueue
 	} else {
 		d.dropped = 0
 	}
 
-	// Utilization = incoming / capacity
 	if d.CapacityRPS > 0.0 {
-		d.utilization = math.Min(incoming/d.CapacityRPS, 1.0)
+		sutil := incoming / d.CapacityRPS
+		d.utilization = math.Min(sutil, 1.0)
 	}
-
-	// Latency = baseLatency + queue wait time (seconds → ms)
-	d.latency = d.BaseLatency
-	if d.CapacityRPS > 0.0 {
-		d.latency += (d.queueDepth / d.CapacityRPS) * 1000.0
-	}
-	// No downstream — database is a terminal node.
 }
 
-// GetMetrics returns the current metrics for this database.
+func (d *Database) CurrentLatency() float64 {
+	queueDelay := 0.0
+	if d.CapacityRPS > 0 {
+		queueDelay = (d.queueDepth / d.CapacityRPS) * 1000.0
+	}
+	return d.BaseLatency + queueDelay
+}
+
 func (d *Database) GetMetrics() NodeMetrics {
+	lat := d.CurrentLatency()
 	return NodeMetrics{
 		ID:          d.NodeID,
 		Type:        d.NodeType,
 		Label:       d.NodeLabel,
 		Utilization: d.utilization,
-		Latency:     d.latency,
+		Latency:     lat,
 		QueueDepth:  d.queueDepth,
 		Throughput:  d.throughput,
 		Dropped:     d.totalDropped,

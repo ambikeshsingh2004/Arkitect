@@ -41,7 +41,19 @@ function AppServerNode({ data }) {
           <p className="text-xs font-semibold text-white">{data.label || 'App Server'}</p>
           <p className="text-[9px] text-slate-500 uppercase tracking-wider">App Server</p>
         </div>
-        <div className={`w-2.5 h-2.5 rounded-full ${glowColors[status]} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+        <div className="flex flex-col items-end gap-1">
+          <div className={`w-2 h-2 rounded-full ${glowColors[status]} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+          {status !== 'idle' && (
+            <span className={`text-[7px] font-bold px-1 py-0.5 rounded border ${
+              status === 'healthy' ? 'text-emerald-400 border-emerald-500/30' :
+              status === 'stressed' ? 'text-amber-400 border-amber-500/30' :
+              status === 'overloaded' ? 'text-rose-400 border-rose-500/30' :
+              'text-slate-500 border-slate-500/30'
+            }`}>
+              {status.toUpperCase()}
+            </span>
+          )}
+        </div>
       </div>
 
       {status !== 'idle' && (

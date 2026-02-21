@@ -28,6 +28,7 @@ type Node interface {
 	SetDown(down bool)
 	IsDown() bool
 	MaxRPS() float64
+	CurrentLatency() float64
 }
 
 // ---- Base node with shared fields ----

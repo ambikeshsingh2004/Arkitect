@@ -203,6 +203,8 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 			BackpressureThreshold float64 `json:"backpressureThreshold,omitempty"`
 			Algorithm             string  `json:"algorithm,omitempty"`
 			ReadRatio             float64 `json:"readRatio,omitempty"`
+			ConcurrencyLimit      float64 `json:"concurrencyLimit,omitempty"`
+			IsReplica             *bool   `json:"isReplica,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "Invalid body", http.StatusBadRequest)
@@ -217,8 +219,12 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		if body.BackpressureEnabled != nil {
 			bp = *body.BackpressureEnabled
 		}
-		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.BackpressureEnabled != nil || body.BackpressureThreshold > 0 || body.Algorithm != "" || body.ReadRatio > 0 {
-			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.BackpressureThreshold, body.ReadRatio, bp, body.Algorithm) {
+		ir := false
+		if body.IsReplica != nil {
+			ir = *body.IsReplica
+		}
+		if body.MaxRPS > 0 || body.BaseLatency > 0 || body.BackpressureEnabled != nil || body.BackpressureThreshold > 0 || body.Algorithm != "" || body.ReadRatio > 0 || body.ConcurrencyLimit > 0 || body.IsReplica != nil {
+			if !session.Simulator.UpdateNodeConfig(body.NodeID, body.MaxRPS, body.BaseLatency, body.BackpressureThreshold, body.ReadRatio, body.ConcurrencyLimit, bp, ir, body.Algorithm) {
 				// Not an error for client/LB nodes — just skip
 			}
 		}

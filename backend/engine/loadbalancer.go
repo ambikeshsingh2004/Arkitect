@@ -137,6 +137,24 @@ func (lb *LoadBalancer) MaxRPS() float64 {
 	return lb.CapacityRPS
 }
 
+func (lb *LoadBalancer) CurrentLatency() float64 {
+	downstream := lb.Downstream()
+	var alive []Node
+	for _, node := range downstream {
+		if !node.IsDown() {
+			alive = append(alive, node)
+		}
+	}
+	if len(alive) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, node := range alive {
+		sum += node.CurrentLatency()
+	}
+	return (sum / float64(len(alive))) + 0.5 // + neglible routing overhead
+}
+
 // GetMetrics returns the current metrics for this load balancer.
 func (lb *LoadBalancer) GetMetrics() NodeMetrics {
 	util := 0.0

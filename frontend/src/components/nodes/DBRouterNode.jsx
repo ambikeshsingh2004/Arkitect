@@ -21,6 +21,16 @@ function DBRouterNode({ data }) {
           <p className="text-xs font-semibold text-white">{data.label || 'DB Router'}</p>
           <p className="text-[9px] text-slate-500 uppercase tracking-wider">Read/Write Split</p>
         </div>
+        <div className="flex flex-col items-end gap-1">
+          <div className={`w-2 h-2 rounded-full ${status === 'down' ? 'bg-rose-500' : 'bg-violet-500'} ${status !== 'idle' ? 'animate-pulse' : ''}`} />
+          {status !== 'idle' && (
+            <span className={`text-[7px] font-bold px-1 py-0.5 rounded border ${
+              status === 'down' ? 'text-rose-400 border-rose-500/30' : 'text-violet-400 border-violet-500/30'
+            }`}>
+              {status === 'down' ? 'DOWN' : 'ACTIVE'}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">

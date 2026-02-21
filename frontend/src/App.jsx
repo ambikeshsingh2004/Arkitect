@@ -40,7 +40,7 @@ const defaultEdgeOptions = {
 // Default data per node type
 const defaultNodeData = {
   client: { rps: 100 },
-  loadbalancer: { algorithm: 'round-robin' },
+  loadbalancer: { algorithm: 'round-robin', backpressureEnabled: false },
   appserver: { maxRPS: 100, baseLatency: 20 },
   database: { maxRPS: 50, baseLatency: 50 },
   dbrouter: {},
@@ -175,9 +175,13 @@ function App() {
         id: n.id,
         type: n.type,
         label: n.data.label,
-        maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
+        maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : n.type === 'loadbalancer' ? 500 : 0),
         baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
         isReplica: n.data.isReplica || false,
+        backpressureEnabled: n.data.backpressureEnabled || false,
+        backpressureThreshold: n.data.backpressureThreshold || 0.9,
+        algorithm: n.data.algorithm || 'round-robin',
+        readRatio: n.data.readRatio || 0.7,
       })),
       edges: currentEdges.map((e) => ({
         source: e.source,
@@ -274,9 +278,13 @@ function App() {
         id: n.id,
         type: n.type,
         label: n.data.label,
-        maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
+        maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : n.type === 'loadbalancer' ? 500 : 0),
         baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
         isReplica: n.data.isReplica || false,
+        backpressureEnabled: n.data.backpressureEnabled || false,
+        backpressureThreshold: n.data.backpressureThreshold || 0.9,
+        algorithm: n.data.algorithm || 'round-robin',
+        readRatio: n.data.readRatio || 0.7,
       })),
       edges: edges.map((e) => ({
         source: e.source,

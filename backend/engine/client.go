@@ -46,3 +46,7 @@ func (c *Client) GetMetrics() NodeMetrics {
 		Status:     "healthy",
 	}
 }
+
+func (c *Client) MaxRPS() float64 {
+	return 0
+}

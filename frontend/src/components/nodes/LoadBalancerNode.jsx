@@ -11,6 +11,7 @@ function LoadBalancerNode({ data }) {
     healthy: 'border-emerald-500/40 shadow-emerald-500/10',
     stressed: 'border-amber-500/40 shadow-amber-500/10',
     overloaded: 'border-rose-500/40 shadow-rose-500/10',
+    rejecting: 'border-amber-500/60 shadow-amber-500/20',
     idle: 'border-blue-500/20 shadow-blue-500/5',
   };
 
@@ -18,6 +19,7 @@ function LoadBalancerNode({ data }) {
     healthy: 'bg-emerald-500',
     stressed: 'bg-amber-500',
     overloaded: 'bg-rose-500',
+    rejecting: 'bg-amber-500',
     idle: 'bg-blue-500',
   };
 
@@ -42,15 +44,30 @@ function LoadBalancerNode({ data }) {
       </div>
 
       {status !== 'idle' && (
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="bg-white/5 rounded-lg p-2 text-center">
-            <p className="text-slate-500 text-[10px]">Throughput</p>
-            <p className="text-blue-400 font-mono font-bold">{throughput.toFixed(0)}</p>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-white/5 rounded-lg p-2 text-center">
+              <p className="text-slate-500 text-[10px]">Throughput</p>
+              <p className="text-blue-400 font-mono font-bold">{throughput.toFixed(0)}</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-2 text-center">
+              <p className="text-slate-500 text-[10px]">Util %</p>
+              <p className="text-blue-400 font-mono font-bold">{(utilization * 100).toFixed(0)}%</p>
+            </div>
           </div>
-          <div className="bg-white/5 rounded-lg p-2 text-center">
-            <p className="text-slate-500 text-[10px]">Util %</p>
-            <p className="text-blue-400 font-mono font-bold">{(utilization * 100).toFixed(0)}%</p>
-          </div>
+
+          {(data.backpressureEnabled || data.metrics?.dropped > 0) && (
+            <div className={`rounded-lg p-1.5 text-center border ${
+              data.metrics?.dropped > 0 
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+                : 'bg-white/5 border-white/10 text-slate-500'
+            }`}>
+              <p className="text-[9px] uppercase tracking-tighter">Backpressure</p>
+              <p className="text-[10px] font-mono font-bold">
+                {data.metrics?.dropRate > 0 ? `REJECTING: ${data.metrics.dropRate.toFixed(0)} RPS` : 'ENABLED'}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

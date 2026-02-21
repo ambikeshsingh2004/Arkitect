@@ -6,7 +6,7 @@ import "math"
 // When incoming + queued exceeds MaxRPS, only MaxRPS queries are processed per tick.
 type Database struct {
 	BaseNode
-	MaxRPS      float64
+	CapacityRPS float64
 	BaseLatency float64 // ms
 
 	queueDepth   float64
@@ -26,7 +26,7 @@ func NewDatabase(id, label string, maxRPS, baseLatency float64) *Database {
 			NodeType:  "database",
 			NodeLabel: label,
 		},
-		MaxRPS:      maxRPS,
+		CapacityRPS: maxRPS,
 		BaseLatency: baseLatency,
 	}
 }
@@ -48,13 +48,13 @@ func (d *Database) Process() {
 
 	totalArrival := incoming + d.queueDepth
 
-	processed := math.Min(totalArrival, d.MaxRPS)
+	processed := math.Min(totalArrival, d.CapacityRPS)
 	d.throughput = processed
 
 	d.queueDepth = math.Max(0.0, totalArrival-processed)
 
 	// Drop if queue exceeds 5x capacity
-	maxQueue := d.MaxRPS * 5.0
+	maxQueue := d.CapacityRPS * 5.0
 	if d.queueDepth > maxQueue {
 		d.dropped = d.queueDepth - maxQueue
 		d.totalDropped += d.dropped // accumulate
@@ -64,14 +64,14 @@ func (d *Database) Process() {
 	}
 
 	// Utilization = incoming / capacity
-	if d.MaxRPS > 0.0 {
-		d.utilization = math.Min(incoming/d.MaxRPS, 1.0)
+	if d.CapacityRPS > 0.0 {
+		d.utilization = math.Min(incoming/d.CapacityRPS, 1.0)
 	}
 
 	// Latency = baseLatency + queue wait time (seconds → ms)
 	d.latency = d.BaseLatency
-	if d.MaxRPS > 0.0 {
-		d.latency += (d.queueDepth / d.MaxRPS) * 1000.0
+	if d.CapacityRPS > 0.0 {
+		d.latency += (d.queueDepth / d.CapacityRPS) * 1000.0
 	}
 	// No downstream — database is a terminal node.
 }
@@ -87,6 +87,11 @@ func (d *Database) GetMetrics() NodeMetrics {
 		QueueDepth:  d.queueDepth,
 		Throughput:  d.throughput,
 		Dropped:     d.totalDropped,
+		DropRate:    d.dropped,
 		Status:      StatusFromUtilization(d.utilization, d.queueDepth, d.Down),
 	}
+}
+
+func (d *Database) MaxRPS() float64 {
+	return d.CapacityRPS
 }

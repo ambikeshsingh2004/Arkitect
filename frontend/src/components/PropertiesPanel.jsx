@@ -47,6 +47,14 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
           body.maxRPS = value;
         } else if (field === 'baseLatency') {
           body.baseLatency = value;
+        } else if (field === 'backpressureEnabled') {
+          body.backpressureEnabled = value;
+        } else if (field === 'backpressureThreshold') {
+          body.backpressureThreshold = value;
+        } else if (field === 'algorithm') {
+          body.algorithm = value;
+        } else if (field === 'readRatio') {
+          body.readRatio = value;
         }
 
         await fetch(`/api/simulate/${sessionId}/config`, {
@@ -185,18 +193,72 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
           </>
         )}
 
-        {/* LB-specific: algorithm */}
         {node.type === 'loadbalancer' && (
-          <FieldGroup label="Algorithm">
-            <select
-              value={node.data.algorithm || 'round-robin'}
-              onChange={(e) => handleChange('algorithm', e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50"
-            >
-              <option value="round-robin">Round Robin</option>
-              <option value="least-connections">Least Connections</option>
-            </select>
-          </FieldGroup>
+          <>
+            <FieldGroup label="Max Capacity (RPS)">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="50"
+                  max="2000"
+                  value={node.data.maxRPS || 500}
+                  onChange={(e) => handleChange('maxRPS', Number(e.target.value))}
+                  className="flex-1 accent-blue-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-xs text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded-md min-w-[48px] text-center">
+                  {node.data.maxRPS || 500}
+                </span>
+              </div>
+            </FieldGroup>
+            <FieldGroup label="Algorithm">
+              <select
+                value={node.data.algorithm || 'round-robin'}
+                onChange={(e) => handleChange('algorithm', e.target.value)}
+                className="w-full bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500/50 appearance-none cursor-pointer"
+                style={{ backgroundColor: '#111827' }} // Force dark background for options in some browsers
+              >
+                <option value="round-robin" className="bg-slate-900">Round Robin</option>
+                <option value="weighted" className="bg-slate-900">Divide by Capacity</option>
+              </select>
+            </FieldGroup>
+            <FieldGroup label="Backpressure Control">
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleChange('backpressureEnabled', !node.data.backpressureEnabled)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
+                    node.data.backpressureEnabled
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                      : 'bg-white/5 border-white/10 text-slate-400'
+                  }`}
+                >
+                  <span className="text-xs font-medium">Reject Load {'>'} {(node.data.backpressureThreshold * 100 || 90).toFixed(0)}%</span>
+                  <div className={`w-8 h-4 rounded-full relative transition-colors ${node.data.backpressureEnabled ? 'bg-amber-500' : 'bg-slate-700'}`}>
+                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${node.data.backpressureEnabled ? 'left-4.5' : 'left-0.5'}`} />
+                  </div>
+                </button>
+                
+                {node.data.backpressureEnabled && (
+                  <div className="px-1">
+                    <p className="text-[10px] text-slate-500 mb-1.5 uppercase tracking-tight">Threshold Limit</p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="0.95"
+                        step="0.05"
+                        value={node.data.backpressureThreshold || 0.9}
+                        onChange={(e) => handleChange('backpressureThreshold', Number(e.target.value))}
+                        className="flex-1 accent-amber-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-[10px] text-amber-400 font-mono bg-amber-500/10 px-1.5 py-0.5 rounded text-center min-w-[32px]">
+                        {(node.data.backpressureThreshold * 100 || 90).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FieldGroup>
+          </>
         )}
 
         {/* Live Metrics (during simulation) */}
@@ -257,6 +319,32 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
             <Trash2 className="w-4 h-4" />
             Remove
           </button>
+        )}
+        {node.type === 'dbrouter' && (
+          <>
+            <FieldGroup label="Read/Write Split">
+              <div className="space-y-3">
+                <div className="flex justify-between text-[10px] uppercase tracking-wider font-semibold">
+                  <span className="text-cyan-400">Reads: {(node.data.readRatio * 100 || 70).toFixed(0)}%</span>
+                  <span className="text-rose-400">Writes: {((1 - (node.data.readRatio || 0.7)) * 100).toFixed(0)}%</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={node.data.readRatio || 0.7}
+                    onChange={(e) => handleChange('readRatio', Number(e.target.value))}
+                    className="flex-1 accent-cyan-500 h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <p className="text-[9px] text-slate-500 leading-tight">
+                  Adjust the portion of traffic directed to Read Replicas vs Primaries.
+                </p>
+              </div>
+            </FieldGroup>
+          </>
         )}
       </div>
     </div>

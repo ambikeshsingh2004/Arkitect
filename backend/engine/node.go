@@ -10,6 +10,7 @@ type NodeMetrics struct {
 	QueueDepth  float64 `json:"queueDepth"`
 	Throughput  float64 `json:"throughput"`
 	Dropped     float64 `json:"dropped"`
+	DropRate    float64 `json:"dropRate"`
 	Status      string  `json:"status"` // "healthy", "stressed", "overloaded", "down"
 }
 
@@ -26,6 +27,7 @@ type Node interface {
 	Downstream() []Node
 	SetDown(down bool)
 	IsDown() bool
+	MaxRPS() float64
 }
 
 // ---- Base node with shared fields ----

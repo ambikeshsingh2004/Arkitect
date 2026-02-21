@@ -7,7 +7,7 @@ import "math"
 // Excess accumulates in the queue, causing latency amplification.
 type AppServer struct {
 	BaseNode
-	MaxRPS      float64
+	CapacityRPS float64
 	BaseLatency float64 // ms
 
 	queueDepth   float64
@@ -26,7 +26,7 @@ func NewAppServer(id, label string, maxRPS, baseLatency float64) *AppServer {
 			NodeType:  "appserver",
 			NodeLabel: label,
 		},
-		MaxRPS:      maxRPS,
+		CapacityRPS: maxRPS,
 		BaseLatency: baseLatency,
 	}
 }
@@ -49,14 +49,14 @@ func (s *AppServer) Process() {
 	totalArrival := incoming + s.queueDepth
 
 	// How much we can actually process this tick
-	processed := math.Min(totalArrival, s.MaxRPS)
+	processed := math.Min(totalArrival, s.CapacityRPS)
 	s.throughput = processed
 
 	// Remaining goes back into queue
 	s.queueDepth = math.Max(0.0, totalArrival-processed)
 
 	// Drop if queue exceeds 5x capacity (prevent infinite buildup)
-	maxQueue := s.MaxRPS * 5.0
+	maxQueue := s.CapacityRPS * 5.0
 	if s.queueDepth > maxQueue {
 		s.dropped = s.queueDepth - maxQueue
 		s.totalDropped += s.dropped // accumulate
@@ -66,14 +66,14 @@ func (s *AppServer) Process() {
 	}
 
 	// Utilization = incoming / capacity (how much of capacity is demanded)
-	if s.MaxRPS > 0.0 {
-		s.utilization = math.Min(incoming/s.MaxRPS, 1.0)
+	if s.CapacityRPS > 0.0 {
+		s.utilization = math.Min(incoming/s.CapacityRPS, 1.0)
 	}
 
 	// Latency = baseLatency + queue wait time (seconds → ms)
 	s.latency = s.BaseLatency
-	if s.MaxRPS > 0.0 {
-		s.latency += (s.queueDepth / s.MaxRPS) * 1000.0
+	if s.CapacityRPS > 0.0 {
+		s.latency += (s.queueDepth / s.CapacityRPS) * 1000.0
 	}
 
 	// Forward processed traffic downstream (cascading overload)
@@ -98,6 +98,11 @@ func (s *AppServer) GetMetrics() NodeMetrics {
 		QueueDepth:  s.queueDepth,
 		Throughput:  s.throughput,
 		Dropped:     s.totalDropped,
+		DropRate:    s.dropped,
 		Status:      StatusFromUtilization(s.utilization, s.queueDepth, s.Down),
 	}
+}
+
+func (s *AppServer) MaxRPS() float64 {
+	return s.CapacityRPS
 }

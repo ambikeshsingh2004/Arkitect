@@ -9,12 +9,16 @@ import (
 
 // NodeConfig represents a node definition from the frontend.
 type NodeConfig struct {
-	ID          string  `json:"id"`
-	Type        string  `json:"type"`
-	Label       string  `json:"label"`
-	MaxRPS      float64 `json:"maxRPS,omitempty"`
-	BaseLatency float64 `json:"baseLatency,omitempty"`
-	IsReplica   bool    `json:"isReplica,omitempty"`
+	ID                    string  `json:"id"`
+	Type                  string  `json:"type"`
+	Label                 string  `json:"label"`
+	MaxRPS                float64 `json:"maxRPS,omitempty"`
+	BaseLatency           float64 `json:"baseLatency,omitempty"`
+	IsReplica             bool    `json:"isReplica,omitempty"`
+	BackpressureEnabled   bool    `json:"backpressureEnabled,omitempty"`
+	BackpressureThreshold float64 `json:"backpressureThreshold,omitempty"`
+	Algorithm             string  `json:"algorithm,omitempty"`
+	ReadRatio             float64 `json:"readRatio,omitempty"`
 }
 
 // EdgeConfig represents an edge (connection) from the frontend.
@@ -63,7 +67,20 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 		case "client":
 			node = NewClient(nc.ID, nc.Label)
 		case "loadbalancer":
-			node = NewLoadBalancer(nc.ID, nc.Label)
+			maxRPS := nc.MaxRPS
+			if maxRPS == 0 {
+				maxRPS = 500 // default
+			}
+			lb := NewLoadBalancer(nc.ID, nc.Label)
+			lb.CapacityRPS = maxRPS
+			lb.BackpressureEnabled = nc.BackpressureEnabled
+			if nc.BackpressureThreshold > 0 {
+				lb.BackpressureThreshold = nc.BackpressureThreshold
+			}
+			if nc.Algorithm != "" {
+				lb.Algorithm = nc.Algorithm
+			}
+			node = lb
 		case "appserver":
 			maxRPS := nc.MaxRPS
 			if maxRPS == 0 {
@@ -87,7 +104,11 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 			db.IsReplica = nc.IsReplica
 			node = db
 		case "dbrouter":
-			node = NewDBRouter(nc.ID, nc.Label)
+			r := NewDBRouter(nc.ID, nc.Label)
+			if nc.ReadRatio > 0 {
+				r.ReadRatio = nc.ReadRatio
+			}
+			node = r
 		default:
 			return nil, fmt.Errorf("unknown node type: %s", nc.Type)
 		}

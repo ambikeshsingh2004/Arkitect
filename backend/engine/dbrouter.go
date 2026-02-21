@@ -6,6 +6,7 @@ package engine
 type DBRouter struct {
 	BaseNode
 	throughput float64
+	ReadRatio  float64 // 0.0 to 1.0 (portion of traffic that is reads)
 }
 
 // NewDBRouter creates a new DBRouter node.
@@ -16,10 +17,11 @@ func NewDBRouter(id, label string) *DBRouter {
 			NodeType:  "dbrouter",
 			NodeLabel: label,
 		},
+		ReadRatio: 0.7, // default 70% reads
 	}
 }
 
-// Process splits incoming RPS 3:7 into writes and reads.
+// Process splits incoming RPS based on ReadRatio.
 func (r *DBRouter) Process() {
 	if r.Down {
 		r.throughput = 0
@@ -36,8 +38,15 @@ func (r *DBRouter) Process() {
 		return
 	}
 
-	writeTraffic := incoming * 0.3
-	readTraffic := incoming * 0.7
+	readRatio := r.ReadRatio
+	if readRatio < 0 {
+		readRatio = 0
+	} else if readRatio > 1 {
+		readRatio = 1
+	}
+
+	readTraffic := incoming * readRatio
+	writeTraffic := incoming * (1.0 - readRatio)
 
 	var primaries []Node
 	var replicas []Node
@@ -95,4 +104,8 @@ func (r *DBRouter) GetMetrics() NodeMetrics {
 		Throughput:  r.throughput,
 		Status:      StatusFromUtilization(util, 0, r.Down),
 	}
+}
+
+func (r *DBRouter) MaxRPS() float64 {
+	return 0
 }

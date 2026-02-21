@@ -38,7 +38,14 @@ function DatabaseNode({ data }) {
           <Database className="w-4 h-4" />
         </div>
         <div className="flex-1">
-          <p className="text-xs font-semibold text-white">{data.label || 'Database'}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold text-white">{data.label || 'Database'}</p>
+            {data.isReplica && (
+              <span className="text-[8px] font-bold text-violet-400 bg-violet-500/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                Replica
+              </span>
+            )}
+          </div>
           <p className="text-[9px] text-slate-500 uppercase tracking-wider">Database</p>
         </div>
         <div className={`w-2.5 h-2.5 rounded-full ${glowColors[status]} ${status !== 'idle' ? 'animate-pulse' : ''}`} />

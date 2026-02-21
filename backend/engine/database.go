@@ -15,6 +15,7 @@ type Database struct {
 	totalDropped float64 // accumulated drops since start
 	latency      float64
 	utilization  float64
+	IsReplica    bool
 }
 
 // NewDatabase creates a new Database node.

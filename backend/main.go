@@ -217,6 +217,26 @@ func handleSessionAction(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "configured"})
 
+	case "update-graph":
+		session, ok := sessionMgr.Get(sessionID)
+		if !ok {
+			http.Error(w, "Session not found", http.StatusNotFound)
+			return
+		}
+		var config engine.ArchitectureConfig
+		if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+			http.Error(w, "Invalid body", http.StatusBadRequest)
+			return
+		}
+		newGraph, err := engine.BuildGraphFromConfig(&config)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to rebuild graph: %v", err), http.StatusBadRequest)
+			return
+		}
+		session.Simulator.UpdateGraph(newGraph)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
+
 	default:
 		http.Error(w, "Unknown action", http.StatusBadRequest)
 	}

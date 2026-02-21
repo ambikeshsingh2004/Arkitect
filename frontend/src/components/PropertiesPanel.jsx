@@ -1,11 +1,12 @@
 import React from 'react';
-import { X, Server, Database, Share2, Users, Power, PowerOff } from 'lucide-react';
+import { X, Server, Database, Share2, Users, Power, PowerOff, Copy, Trash2, Split } from 'lucide-react';
 
 const typeLabels = {
   client: 'Client',
   loadbalancer: 'Load Balancer',
   appserver: 'App Server',
   database: 'Database',
+  dbrouter: 'DB Router',
 };
 
 const typeIcons = {
@@ -13,6 +14,7 @@ const typeIcons = {
   loadbalancer: <Share2 className="w-4 h-4" />,
   appserver: <Server className="w-4 h-4" />,
   database: <Database className="w-4 h-4" />,
+  dbrouter: <Split className="w-4 h-4" />,
 };
 
 const typeColors = {
@@ -20,9 +22,10 @@ const typeColors = {
   loadbalancer: 'blue',
   appserver: 'indigo',
   database: 'rose',
+  dbrouter: 'violet',
 };
 
-export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, onToggleDown, sessionId }) {
+export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, onToggleDown, sessionId, onAddReplica, onRemoveNode }) {
   if (!node) return null;
 
   const color = typeColors[node.type] || 'slate';
@@ -218,8 +221,20 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
       </div>
 
       {/* Actions */}
-      {isRunning && node.type !== 'client' && (
-        <div className="p-4 border-t border-white/5">
+      <div className="p-4 border-t border-white/5 flex flex-col gap-2">
+        {/* Add Replica — only for database nodes when not running */}
+        {!isRunning && node.type === 'database' && (
+          <button
+            onClick={() => onAddReplica(node.id)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-violet-500/15 text-violet-400 border border-violet-500/30 hover:bg-violet-500/25"
+          >
+            <Copy className="w-4 h-4" />
+            Add Replica
+          </button>
+        )}
+
+        {/* Toggle UP/DOWN — during simulation */}
+        {isRunning && node.type !== 'client' && (
           <button
             onClick={() => onToggleDown(node.id, !isDown)}
             className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
@@ -231,8 +246,19 @@ export default function PropertiesPanel({ node, onClose, onUpdate, isRunning, on
             {isDown ? <Power className="w-4 h-4" /> : <PowerOff className="w-4 h-4" />}
             {isDown ? 'Bring UP' : 'Take DOWN'}
           </button>
-        </div>
-      )}
+        )}
+
+        {/* Remove node — only when not running */}
+        {!isRunning && (
+          <button
+            onClick={() => onRemoveNode(node.id)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:border-rose-500/30"
+          >
+            <Trash2 className="w-4 h-4" />
+            Remove
+          </button>
+        )}
+      </div>
     </div>
   );
 }

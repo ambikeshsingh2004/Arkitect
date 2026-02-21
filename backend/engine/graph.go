@@ -14,6 +14,7 @@ type NodeConfig struct {
 	Label       string  `json:"label"`
 	MaxRPS      float64 `json:"maxRPS,omitempty"`
 	BaseLatency float64 `json:"baseLatency,omitempty"`
+	IsReplica   bool    `json:"isReplica,omitempty"`
 }
 
 // EdgeConfig represents an edge (connection) from the frontend.
@@ -82,7 +83,11 @@ func BuildGraphFromConfig(config *ArchitectureConfig) (*Graph, error) {
 			if baseLatency == 0 {
 				baseLatency = 50 // default 50ms
 			}
-			node = NewDatabase(nc.ID, nc.Label, maxRPS, baseLatency)
+			db := NewDatabase(nc.ID, nc.Label, maxRPS, baseLatency)
+			db.IsReplica = nc.IsReplica
+			node = db
+		case "dbrouter":
+			node = NewDBRouter(nc.ID, nc.Label)
 		default:
 			return nil, fmt.Errorf("unknown node type: %s", nc.Type)
 		}

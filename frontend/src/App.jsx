@@ -10,12 +10,13 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Layout, Play, Square, Activity, Database, Server, Share2, Users, Zap, ZapOff, Trash2 } from 'lucide-react';
+import { Layout, Play, Square, Activity, Database, Server, Share2, Users, Zap, ZapOff, Trash2, Copy, Split } from 'lucide-react';
 
 import LoadBalancerNode from './components/nodes/LoadBalancerNode.jsx';
 import AppServerNode from './components/nodes/AppServerNode.jsx';
 import DatabaseNode from './components/nodes/DatabaseNode.jsx';
 import ClientNode from './components/nodes/ClientNode.jsx';
+import DBRouterNode from './components/nodes/DBRouterNode.jsx';
 import PropertiesPanel from './components/PropertiesPanel.jsx';
 
 const nodeTypes = {
@@ -23,6 +24,7 @@ const nodeTypes = {
   loadbalancer: LoadBalancerNode,
   appserver: AppServerNode,
   database: DatabaseNode,
+  dbrouter: DBRouterNode,
 };
 
 let nodeId = 0;
@@ -41,6 +43,7 @@ const defaultNodeData = {
   loadbalancer: { algorithm: 'round-robin' },
   appserver: { maxRPS: 100, baseLatency: 20 },
   database: { maxRPS: 50, baseLatency: 50 },
+  dbrouter: {},
 };
 
 function App() {
@@ -64,9 +67,39 @@ function App() {
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
 
-  const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
-  const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
-  const onConnect = useCallback((connection) => setEdges((eds) => addEdge({ ...connection, ...defaultEdgeOptions }, eds)), []);
+  const onNodesChange = useCallback((changes) => {
+    setNodes((nds) => {
+      const nextNodes = applyNodeChanges(changes, nds);
+      
+      // If a node was deleted via keyboard, sync the change
+      if (isRunning && sessionId && changes.some(c => c.type === 'remove')) {
+        syncSimulation(nextNodes, edges);
+      }
+      return nextNodes;
+    });
+  }, [isRunning, sessionId, edges]);
+
+  const onEdgesChange = useCallback((changes) => {
+    setEdges((eds) => {
+      const nextEdges = applyEdgeChanges(changes, eds);
+      
+      // If an edge was deleted via keyboard, sync the change
+      if (isRunning && sessionId && changes.some(c => c.type === 'remove')) {
+        syncSimulation(nodes, nextEdges);
+      }
+      return nextEdges;
+    });
+  }, [isRunning, sessionId, nodes]);
+
+  const onConnect = useCallback((connection) => {
+    setEdges((eds) => {
+      const nextEdges = addEdge({ ...connection, ...defaultEdgeOptions }, eds);
+      if (isRunning && sessionId) {
+        syncSimulation(nodes, nextEdges);
+      }
+      return nextEdges;
+    });
+  }, [isRunning, sessionId, nodes]);
 
   // Select node on click
   const onNodeClick = useCallback((event, node) => {
@@ -87,12 +120,103 @@ function App() {
     );
   }, []);
 
+  // Add a replica of a database node
+  const addReplica = useCallback((nodeId) => {
+    const sourceNode = nodes.find((n) => n.id === nodeId);
+    if (!sourceNode || sourceNode.type !== 'database') return;
+
+    const replicaId = getId();
+    const replicaLabel = `${sourceNode.data.label} Replica`;
+
+    // Position replica 200px to the right of the source
+    const newNode = {
+      id: replicaId,
+      type: 'database',
+      position: {
+        x: sourceNode.position.x + 220,
+        y: sourceNode.position.y,
+      },
+      data: {
+        label: replicaLabel,
+        metrics: null,
+        maxRPS: sourceNode.data.maxRPS || 50,
+        baseLatency: sourceNode.data.baseLatency || 50,
+        isReplica: true,
+      },
+    };
+
+    // Find all incoming edges to the source node and duplicate them for the replica
+    const newEdges = edges
+      .filter((e) => e.target === nodeId)
+      .map((e) => ({
+        id: `e-${e.source}-${replicaId}`,
+        source: e.source,
+        sourceHandle: e.sourceHandle,
+        target: replicaId,
+        targetHandle: e.targetHandle,
+        ...defaultEdgeOptions,
+      }));
+
+    setNodes((nds) => {
+      const nextNodes = nds.concat(newNode);
+      if (isRunning && sessionId) syncSimulation(nextNodes, nextEdges);
+      return nextNodes;
+    });
+    setEdges((eds) => eds.concat(newEdges));
+  }, [nodes, edges, isRunning, sessionId]);
+
+  // Sync current architecture to living backend session
+  const syncSimulation = async (currentNodes, currentEdges) => {
+    if (!isRunning || !sessionId) return;
+    
+    const trafficRPS = currentNodes.find((n) => n.type === 'client')?.data?.rps || 100;
+    const payload = {
+      nodes: currentNodes.map((n) => ({
+        id: n.id,
+        type: n.type,
+        label: n.data.label,
+        maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
+        baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
+        isReplica: n.data.isReplica || false,
+      })),
+      edges: currentEdges.map((e) => ({
+        source: e.source,
+        target: e.target,
+      })),
+      trafficRPS: trafficRPS,
+    };
+
+    try {
+      await fetch(`/api/simulate/${sessionId}/update-graph`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error('Failed to sync simulation:', err);
+    }
+  };
+
   // Clear all
   const clearAll = () => {
     setNodes([]);
     setEdges([]);
     setSelectedNodeId(null);
   };
+
+  // Remove a single node and its connected edges
+  const removeNode = useCallback((nodeId) => {
+    const nextNodes = nodes.filter((n) => n.id !== nodeId);
+    const nextEdges = edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+    
+    setNodes(nextNodes);
+    setEdges(nextEdges);
+    setSelectedNodeId(null);
+
+    if (isRunning && sessionId) {
+      syncSimulation(nextNodes, nextEdges);
+    }
+  }, [nodes, edges, isRunning, sessionId]);
 
   // — Drag-and-drop from sidebar —
   const onDragOver = useCallback((event) => {
@@ -116,6 +240,7 @@ function App() {
         loadbalancer: 'Load Balancer',
         appserver: 'App Server',
         database: 'Database',
+        dbrouter: 'DB Router',
       };
 
       const newNode = {
@@ -129,9 +254,15 @@ function App() {
         },
       };
 
-      setNodes((nds) => nds.concat(newNode));
+      setNodes((nds) => {
+        const nextNodes = nds.concat(newNode);
+        if (isRunning && sessionId) {
+          syncSimulation(nextNodes, edges);
+        }
+        return nextNodes;
+      });
     },
-    [reactFlowInstance]
+    [reactFlowInstance, isRunning, sessionId, edges]
   );
 
   // — Simulation control —
@@ -145,6 +276,7 @@ function App() {
         label: n.data.label,
         maxRPS: n.data.maxRPS || (n.type === 'appserver' ? 100 : n.type === 'database' ? 50 : 0),
         baseLatency: n.data.baseLatency || (n.type === 'appserver' ? 20 : n.type === 'database' ? 50 : 0),
+        isReplica: n.data.isReplica || false,
       })),
       edges: edges.map((e) => ({
         source: e.source,
@@ -191,7 +323,7 @@ function App() {
             if (metrics) {
               return {
                 ...node,
-                data: { ...node.data, metrics },
+                data: { ...node.data, metrics, isReplica: node.data.isReplica },
               };
             }
             return node;
@@ -204,11 +336,22 @@ function App() {
 
         setEdges((eds) =>
           eds.map((edge) => {
-            const targetStatus = nodeStatusMap[edge.target];
+            const sourceNode = nodes.find(n => n.id === edge.source);
+            const targetNode = nodes.find(n => n.id === edge.target);
+            const targetMetrics = tick.nodes.find((m) => m.id === edge.target);
+            const targetStatus = targetMetrics?.status;
+
             let strokeColor = '#6366f1'; // default indigo
             let strokeW = 2;
 
-            if (targetStatus === 'overloaded') {
+            // DB Router special treatment
+            if (sourceNode?.type === 'dbrouter') {
+              if (targetNode?.data?.isReplica) {
+                strokeColor = '#22d3ee'; // Cyan (Read)
+              } else {
+                strokeColor = '#fb923c'; // Orange (Write)
+              }
+            } else if (targetStatus === 'overloaded') {
               strokeColor = '#f43f5e'; // red
               strokeW = 3;
             } else if (targetStatus === 'stressed') {
@@ -325,6 +468,7 @@ function App() {
             <DraggableItem icon={<Users className="w-4 h-4" />} label="Client" type="client" color="emerald" />
             <DraggableItem icon={<Share2 className="w-4 h-4" />} label="Load Balancer" type="loadbalancer" color="blue" />
             <DraggableItem icon={<Server className="w-4 h-4" />} label="App Server" type="appserver" color="indigo" />
+            <DraggableItem icon={<Split className="w-4 h-4" />} label="DB Router" type="dbrouter" color="violet" />
             <DraggableItem icon={<Database className="w-4 h-4" />} label="Database" type="database" color="rose" />
           </div>
         </div>
@@ -453,6 +597,8 @@ function App() {
           isRunning={isRunning}
           onToggleDown={toggleNodeDown}
           sessionId={sessionId}
+          onAddReplica={addReplica}
+          onRemoveNode={removeNode}
         />
       )}
     </div>

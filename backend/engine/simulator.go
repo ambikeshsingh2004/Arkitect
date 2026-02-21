@@ -101,6 +101,14 @@ func (s *Simulator) UpdateNodeConfig(nodeID string, maxRPS, baseLatency float64)
 	return true
 }
 
+// UpdateGraph replaces the current simulation graph with a new one.
+// This allows adding/removing nodes and edges while the simulation is running.
+func (s *Simulator) UpdateGraph(newGraph *Graph) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.graph = newGraph
+}
+
 // Start begins the simulation loop.
 func (s *Simulator) Start() {
 	ctx, cancel := context.WithCancel(context.Background())

@@ -89,7 +89,7 @@ export default function PropertiesPanel({
   const accentClasses = accentColorMap[color];
 
   return (
-    <div className="w-80 border-l border-white/5 bg-[#0e0e11]/95 backdrop-blur-xl flex flex-col shrink-0 animate-slide-in shadow-[-20px_0_50px_rgba(0,0,0,0.5)] z-20">
+    <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-white/5 bg-[#0e0e11]/95 backdrop-blur-xl flex flex-col shrink-0 animate-slide-in-bottom md:animate-slide-in-right shadow-[-20px_0_50px_rgba(0,0,0,0.5)] z-20 fixed md:relative bottom-0 left-0 right-0 md:h-auto max-h-[80vh] md:max-h-none overflow-hidden rounded-t-3xl md:rounded-t-none">
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent">
         <div className="flex items-center gap-4">

@@ -10,7 +10,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import { Layout, Play, Square, Activity, Database, Server, Share2, Users, Zap, ZapOff, Trash2, Copy, Split } from 'lucide-react';
+import { Layout, Play, Square, Activity, Database, Server, Share2, Users, Zap, ZapOff, Trash2, Copy, Split, Menu, X } from 'lucide-react';
 
 import LoadBalancerNode from './components/nodes/LoadBalancerNode.jsx';
 import AppServerNode from './components/nodes/AppServerNode.jsx';
@@ -63,6 +63,7 @@ function App() {
   const [bottleneckIds, setBottleneckIds] = useState([]);
   const [tickCount, setTickCount] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const wsRef = useRef(null);
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
@@ -248,6 +249,71 @@ function App() {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  const addNode = useCallback((type, position) => {
+    const labelMap = {
+      client: 'Client',
+      loadbalancer: 'Load Balancer',
+      appserver: 'App Server',
+      database: 'Database',
+      dbrouter: 'DB Router',
+    };
+
+    if (type === 'database') {
+      typeCounters.database++;
+      const primaryId = getId();
+      const primaryNode = {
+        id: primaryId,
+        type: 'database',
+        position,
+        data: {
+          label: `Primary DB ${typeCounters.database}`,
+          metrics: null,
+          ...defaultNodeData.database,
+          isReplica: false,
+        },
+      };
+
+      const replicaId = getId();
+      const replicaNode = {
+        id: replicaId,
+        type: 'database',
+        position: { x: position.x + 220, y: position.y },
+        data: {
+          label: `Primary DB ${typeCounters.database} Replica`,
+          metrics: null,
+          ...defaultNodeData.database,
+          isReplica: true,
+        },
+      };
+
+      setNodes((nds) => {
+        const nextNodes = nds.concat(primaryNode, replicaNode);
+        if (isRunning && sessionId) syncSimulation(nextNodes, edges);
+        return nextNodes;
+      });
+    } else {
+      typeCounters[type]++;
+      const newNode = {
+        id: getId(),
+        type,
+        position,
+        data: {
+          label: `${labelMap[type]} ${typeCounters[type]}`,
+          metrics: null,
+          ...defaultNodeData[type],
+        },
+      };
+
+      setNodes((nds) => {
+        const nextNodes = nds.concat(newNode);
+        if (isRunning && sessionId) {
+          syncSimulation(nextNodes, edges);
+        }
+        return nextNodes;
+      });
+    }
+  }, [isRunning, sessionId, edges]);
+
   const onDrop = useCallback(
     (event) => {
       event.preventDefault();
@@ -259,71 +325,28 @@ function App() {
         y: event.clientY,
       });
 
-      const labelMap = {
-        client: 'Client',
-        loadbalancer: 'Load Balancer',
-        appserver: 'App Server',
-        database: 'Database',
-        dbrouter: 'DB Router',
-      };
-
-      if (type === 'database') {
-        typeCounters.database++;
-        const primaryId = getId();
-        const primaryNode = {
-          id: primaryId,
-          type: 'database',
-          position,
-          data: {
-            label: `Primary DB ${typeCounters.database}`,
-            metrics: null,
-            ...defaultNodeData.database,
-            isReplica: false,
-          },
-        };
-
-        const replicaId = getId();
-        const replicaNode = {
-          id: replicaId,
-          type: 'database',
-          position: { x: position.x + 220, y: position.y },
-          data: {
-            label: `Primary DB ${typeCounters.database} Replica`,
-            metrics: null,
-            ...defaultNodeData.database,
-            isReplica: true,
-          },
-        };
-
-        setNodes((nds) => {
-          const nextNodes = nds.concat(primaryNode, replicaNode);
-          if (isRunning && sessionId) syncSimulation(nextNodes, edges);
-          return nextNodes;
-        });
-      } else {
-        typeCounters[type]++;
-        const newNode = {
-          id: getId(),
-          type,
-          position,
-          data: {
-            label: `${labelMap[type]} ${typeCounters[type]}`,
-            metrics: null,
-            ...defaultNodeData[type],
-          },
-        };
-
-        setNodes((nds) => {
-          const nextNodes = nds.concat(newNode);
-          if (isRunning && sessionId) {
-            syncSimulation(nextNodes, edges);
-          }
-          return nextNodes;
-        });
-      }
+      addNode(type, position);
     },
-    [reactFlowInstance, isRunning, sessionId, edges]
+    [reactFlowInstance, addNode]
   );
+
+  const onSidebarItemClick = useCallback((type) => {
+    if (!reactFlowInstance) return;
+
+    // Place at center of current view
+    const { x, y, zoom } = reactFlowInstance.getViewport();
+    const canvas = reactFlowWrapper.current.getBoundingClientRect();
+    const position = {
+      x: (canvas.width / 2 - x) / zoom,
+      y: (canvas.height / 2 - y) / zoom,
+    };
+
+    addNode(type, position);
+    
+    if (window.innerWidth <= 768) {
+      setIsSidebarOpen(false);
+    }
+  }, [reactFlowInstance, addNode]);
 
   // — Simulation control —
   const startSimulation = async () => {
@@ -504,27 +527,46 @@ function App() {
   const trafficRPS = getTrafficRPS();
 
   return (
-    <div className="flex h-screen w-full bg-[#0a0a0c] text-slate-200 overflow-hidden font-sans">
+    <div className="flex h-screen w-full bg-[#0a0a0c] text-slate-200 overflow-hidden font-sans relative">
+      {/* ── Sidebar Overlay (Mobile) ── */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay mobile-only"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* ── Sidebar ── */}
-      <div className="w-64 border-r border-white/5 bg-[#0e0e11] flex flex-col p-4 gap-6 shrink-0">
-        <div className="flex items-center gap-3 px-4 py-2 mb-2">
-          <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_8px_16px_-4px_rgba(99,102,241,0.4)] border border-white/10 group overflow-hidden relative">
-            <Layout className="text-white w-6 h-6 z-10" />
-            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className={`
+        ${isSidebarOpen ? 'sidebar-drawer animate-slide-in-left' : 'hidden md:flex'}
+        w-72 border-r border-white/5 bg-[#0e0e11] flex flex-col p-4 gap-6 shrink-0 z-50
+      `}>
+        <div className="flex items-center justify-between px-4 py-2 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-[0_8px_16px_-4px_rgba(99,102,241,0.4)] border border-white/10 group overflow-hidden relative">
+              <Layout className="text-white w-6 h-6 z-10" />
+              <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight text-white leading-tight">Arkitect</h1>
+              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest opacity-80">v2.0 Preview</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tight text-white leading-tight">Arkitect</h1>
-            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest opacity-80">v2.0 Preview</p>
-          </div>
+          <button 
+            className="mobile-only p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <div className="flex flex-col gap-4 mt-4">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-2">Drag to Canvas</p>
           <div className="flex flex-col gap-2">
-            <DraggableItem icon={<Users className="w-4 h-4" />} label="Client" type="client" color="emerald" />
-            <DraggableItem icon={<Share2 className="w-4 h-4" />} label="Load Balancer" type="loadbalancer" color="blue" />
-            <DraggableItem icon={<Server className="w-4 h-4" />} label="App Server" type="appserver" color="indigo" />
-            <DraggableItem icon={<Database className="w-4 h-4" />} label="Database" type="database" color="rose" />
+            <DraggableItem icon={<Users className="w-4 h-4" />} label="Client" type="client" color="emerald" onClick={() => onSidebarItemClick('client')} />
+            <DraggableItem icon={<Share2 className="w-4 h-4" />} label="LB" type="loadbalancer" color="blue" onClick={() => onSidebarItemClick('loadbalancer')} />
+            <DraggableItem icon={<Server className="w-4 h-4" />} label="Server" type="appserver" color="indigo" onClick={() => onSidebarItemClick('appserver')} />
+            <DraggableItem icon={<Database className="w-4 h-4" />} label="DB" type="database" color="rose" onClick={() => onSidebarItemClick('database')} />
           </div>
         </div>
 
@@ -561,12 +603,18 @@ function App() {
       {/* ── Main Canvas ── */}
       <div className="flex-1 relative flex flex-col" ref={reactFlowWrapper}>
         {/* Header Toolbar */}
-        <div className="h-14 border-b border-white/5 bg-[#0e0e11]/80 backdrop-blur-md flex items-center justify-between px-6 z-10">
-          <div className="flex items-center gap-4">
+        <div className="h-16 md:h-14 border-b border-white/5 bg-[#0e0e11]/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 z-10">
+          <div className="flex items-center gap-2 md:gap-4">
+            <button 
+              className="md:hidden p-2 rounded-xl bg-white/5 text-slate-400 hover:text-white mr-1"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <button
               onClick={isRunning ? stopSimulation : startSimulation}
               disabled={nodes.length === 0}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all duration-500 ${
+              className={`flex items-center gap-2 px-3 md:px-6 py-2 md:py-2.5 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest transition-all duration-500 ${
                 isRunning
                   ? 'bg-rose-500 text-white shadow-[0_0_25px_-5px_rgba(244,63,94,0.4)]'
                   : nodes.length === 0
@@ -574,17 +622,18 @@ function App() {
                   : 'bg-emerald-500 text-black shadow-[0_0_25px_-5px_rgba(16,185,129,0.4)] hover:scale-105 active:scale-95'
               }`}
             >
-              {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-              {isRunning ? 'Terminate' : 'Deploy Simulation'}
+              {isRunning ? <Square className="w-3 md:w-3.5 h-3 md:h-3.5 fill-current" /> : <Play className="w-3 md:w-3.5 h-3 md:h-3.5 fill-current" />}
+              <span className="hidden sm:inline">{isRunning ? 'Terminate' : 'Deploy Simulation'}</span>
+              <span className="sm:hidden">{isRunning ? 'Stop' : 'Run'}</span>
             </button>
 
-            <div className="h-6 w-px bg-white/10" />
+            <div className="h-6 w-px bg-white/10 hidden sm:block" />
 
-            <div className="flex items-center gap-2 text-slate-400 text-sm">
-              <Activity className="w-4 h-4" />
+            <div className="flex items-center gap-2 text-slate-400 text-xs md:text-sm">
+              <Activity className="w-3.5 md:w-4 h-3.5 md:h-4" />
               {isRunning ? (
                 <span className="text-emerald-400">
-                  Tick #{tickCount} · {trafficRPS} rps{spikeOn ? ' (2x spike!)' : ''}
+                  <span className="hidden md:inline">Tick #{tickCount} · </span>{trafficRPS} RPS
                 </span>
               ) : (
                 <span className="text-slate-500">Idle</span>
@@ -592,20 +641,20 @@ function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {bottleneckIds.length > 0 && (
-              <div className="flex items-center gap-2 text-xs bg-rose-500/10 text-rose-400 px-3 py-1.5 rounded-lg border border-rose-500/20">
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                Bottleneck: {bottleneckIds.join(', ')}
+              <div className="flex items-center gap-1.5 md:gap-2 text-[10px] md:text-xs bg-rose-500/10 text-rose-400 px-2 md:px-3 py-1.5 rounded-lg border border-rose-500/20 max-w-[100px] md:max-w-none truncate">
+                <span className="w-1.5 md:w-2 h-1.5 md:h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                <span className="truncate">Bottleneck: {bottleneckIds.join(', ')}</span>
               </div>
             )}
             <button
               onClick={clearAll}
               disabled={isRunning || nodes.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 bg-white/5 border border-white/10 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 bg-white/5 border border-white/10 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Clear All
+              <span className="hidden sm:inline">Clear All</span>
             </button>
           </div>
         </div>
@@ -668,7 +717,7 @@ function App() {
 }
 
 // Draggable sidebar item
-function DraggableItem({ icon, label, type, color }) {
+function DraggableItem({ icon, label, type, color, onClick }) {
   const colorMap = {
     emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
     blue: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
@@ -683,12 +732,13 @@ function DraggableItem({ icon, label, type, color }) {
 
   return (
     <div
-      className="flex items-center gap-3 p-4 rounded-2xl border border-white/5 bg-[#141417]/50 hover:border-white/20 hover:bg-white/5 cursor-grab active:cursor-grabbing transition-all scale-animation"
+      className="flex items-center gap-3 p-3 md:p-4 rounded-2xl border border-white/5 bg-[#141417]/50 hover:border-white/20 hover:bg-white/5 cursor-grab active:cursor-grabbing transition-all scale-animation"
       onDragStart={onDragStart}
       draggable
+      onClick={onClick}
     >
-      <div className={`p-2.5 rounded-xl shadow-lg border border-white/10 ${colorMap[color]} group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
-      <span className="text-sm font-bold text-slate-300 tracking-tight">{label}</span>
+      <div className={`p-2 md:p-2.5 rounded-xl shadow-lg border border-white/10 ${colorMap[color]} group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
+      <span className="text-xs md:text-sm font-bold text-slate-300 tracking-tight">{label}</span>
     </div>
   );
 }
